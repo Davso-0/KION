@@ -39,12 +39,12 @@ En el sector veterinario y agropecuario, los negocios suelen combinar la comerci
 Desarrollar e implementar una aplicación web centralizada de punto de venta e inventario multisede, denominada **KION**, para optimizar la administración operativa de establecimientos comerciales del sector veterinario y agropecuario en el estado de Colima, durante el periodo comprendido entre agosto de 2026 y noviembre de 2026.
 
 ### Objetivos Específicos
-* **Diseño de UI/UX:** Crear interfaces claras e intuitivas para los módulos de administración, inventario y punto de venta (con soporte para dispositivos móviles y escritorio).
-* **Modelo de Datos:** Diseñar una base de datos relacional normalizada (hasta 3FN) para productos, sucursales, usuarios, inventario y ventas.
-* **Control de Acceso (RBAC):** Implementar un sistema de permisos basado en roles de usuario.
-* **Módulo de Ventas:** Desarrollar el punto de venta digital con descuento de inventario automatizado tras cada transacción y generación de tickets.
-* **Gestión Multisede:** Centralizar la administración de sucursales e inventarios diferenciados por sede.
-* **Pruebas y Despliegue:** Probar y desplegar el prototipo funcional en servidores web (IONOS).
+* Crear interfaces claras e intuitivas para los módulos de administración, inventario y punto de venta (con soporte para dispositivos móviles y escritorio).
+* Diseñar una base de datos relacional normalizada (hasta 3FN) para productos, sucursales, usuarios, inventario y ventas.
+* Implementar un sistema de permisos basado en roles de usuario.
+* Desarrollar el punto de venta digital con descuento de inventario automatizado tras cada transacción y generación de tickets.
+* Centralizar la administración de sucursales e inventarios diferenciados por sede.
+* Probar y desplegar el prototipo funcional en servidores web (IONOS).
 
 ---
 
@@ -53,11 +53,11 @@ Desarrollar e implementar una aplicación web centralizada de punto de venta e i
 El sistema sigue un patrón de arquitectura **Cliente-Servidor distribuido en tres capas**:
 
 1. **Capa de Presentación (Frontend):**
-   * HTML5, CSS3, JavaScript (DOM dinámico, validaciones y cambio de idioma).
+   * HTML, CSS, JavaScript
 2. **Capa de Lógica de Negocio (Backend):**
-   * PHP 8.x (Gestión de sesiones seguras, procesamiento transaccional, lógica RBAC y actualización automática de existencias).
+   * PHP *
 3. **Capa de Datos (Database):**
-   * MySQL / MariaDB (Almacenamiento relacional centralizado: `Usuarios`, `Roles`, `Sucursales`, `Productos`, `Categorías`, `Inventarios`, `Ventas` y `Detalle_Ventas`).
+   * MySQL / MariaDB 
 
 ---
 
@@ -72,12 +72,12 @@ El sistema sigue un patrón de arquitectura **Cliente-Servidor distribuido en tr
 ##  Tecnologías y Herramientas
 
 ### Frontend
-* **HTML5:** Estructura y organización semántica de la aplicación.
-* **CSS3:** Diseño responsivo, estilos visuales y adaptación de la interfaz.
+* **HTML:** Estructura y organización semántica de la aplicación.
+* **CSS:** Diseño responsivo, estilos visuales y adaptación de la interfaz.
 * **JavaScript:** Interactividad, validaciones en el cliente y manipulación del DOM.
 
 ### Backend & Base de Datos
-* **PHP 8.x:** Lógica de negocio, controladores y comunicación con el motor relacional.
+* **PHP :** Lógica de negocio, controladores y comunicación con el motor relacional.
 * **MySQL / MariaDB:** Almacenamiento relacional, transacciones y consultas SQL optimizadas.
 * **phpMyAdmin:** Administración y visualización de la base de datos local.
 
