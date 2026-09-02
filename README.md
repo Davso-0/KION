@@ -4,9 +4,7 @@
 KION es una aplicación web centralizada multisede diseñada para optimizar la administración operativa, el control de inventarios y el registro de ventas en establecimientos comerciales del sector veterinario y agropecuario. El sistema permite gestionar de manera independiente las existencias por sucursal manteniendo una base de datos unificada en la nube, operando bajo un modelo de control de acceso basado en roles (RBAC).
 
 ## Integrantes del Equipo
-* **Arteaga Ballinas Emilio Jesús**
 * **Barba Castillo Ricardo Jafet**
-* **Diaz García Fernando Tomas**
 * **Hernández Campos Itzel Aranzazu**
 * **Ibarra Cortés Mía Mariana**
 * **Juárez Lara Fernando Franco**
