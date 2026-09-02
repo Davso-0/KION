@@ -1,24 +1,28 @@
-### Parte Contenido para el archivo `.gitignore`
-
-Crea un archivo llamado `.gitignore` en la raíz de tu repositorio y pega lo siguiente (esto evitará que suban archivos basura o contraseñas a GitHub):
-
-```text
-# Archivos de configuración local y variables de entorno
+# Configuración local
 .env
-config.php
+.env.local
 
-# Dependencias (si usan Composer para PHP en el futuro)
-vendor/
+# Dependencias
+/vendor/
 
-# Archivos del sistema operativo
+# Logs
+*.log
+
+# Archivos temporales
+*.tmp
+*.temp
+
+# Sistema operativo
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Archivos de IDEs (VS Code, PHPStorm, etc.)
+# IDEs
 .vscode/
 .idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+
+# XAMPP
+xampp/
+
+# Backups de base de datos
+*.sql.bak

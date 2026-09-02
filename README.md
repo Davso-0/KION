@@ -29,3 +29,8 @@ proyecto-integrador-kion/
 ├── src/            # Código fuente de la aplicación (PHP, JS, CSS, HTML)
 ├── tests/          # Scripts y capturas de pruebas de funcionamiento
 └── .gitignore      # Exclusiones de Git
+
+## Licencia
+Este proyecto es de carácter académico y se desarrolla bajo la [Licencia MIT](https://opensource.org/licenses/MIT).
+
+
