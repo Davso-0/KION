@@ -91,10 +91,40 @@ El sistema sigue un patrón de arquitectura **Cliente-Servidor distribuido en tr
 ##  Estructura del Directorio
 
 ```text
-proyecto-integrador-kion/
-│
-├── README.md           # Documentación principal del repositorio
-├── docs/               # Documentación del proyecto (Anteproyecto, minutas, manuales)
-├── src/                # Código fuente de la aplicación (PHP, JS, CSS, HTML)
-├── tests/              # Scripts y capturas de pruebas de funcionamiento
-└── .gitignore          # Archivo de exclusiones para Git
+KION/
+├── .gitignore
+├── index.php
+├── README.md
+├── docs/
+│   ├── anteproyecto/
+│   │   └── Anteproyecto KION.pdf
+│   ├── arbol_base_de_datos/
+│   ├── base_datos/
+│   │   └── Arbol_de_base_de_datos.txt
+│   └── minutas/
+│       └── Sem1MinutaEquip2 .pdf
+├── src/
+│   ├── assets/
+│   │   ├── icons/
+│   │   ├── img/
+│   │   └── logo/
+│   ├── css/
+│   │   └── style.css
+│   ├── js/
+│   │   └── script.js
+│   └── php/
+│       ├── componentes/
+│       │   ├── footer.php
+│       │   ├── header.php
+│       │   └── navbar.php
+│       ├── config/
+│       │   └── conexion.php
+│       └── modulos/
+│           ├── catalogo/
+│           ├── dashboard/
+│           ├── home/
+│           │   └── index.php
+│           ├── login_registro/
+│           └── ventas/
+└── tests/
+```
