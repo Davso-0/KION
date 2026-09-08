@@ -1,0 +1,28 @@
+# Configuración local
+.env
+.env.local
+
+# Dependencias
+/vendor/
+
+# Logs
+*.log
+
+# Archivos temporales
+*.tmp
+*.temp
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+
+# XAMPP
+xampp/
+
+# Backups de base de datos
+*.sql.bak
