@@ -49,7 +49,7 @@
                 Iniciar sesión
             </a>
 
-            <a href="#" class="accion">
+            <a href="../../../../registro.php" class="accion">
                 <span>♙+</span>
                 Registrarse
             </a>
