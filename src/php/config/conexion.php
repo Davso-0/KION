@@ -1,4 +1,7 @@
 <?php
-// Punto central para la futura configuración de la conexión a la base de datos.
-// No agregar credenciales, consultas ni lógica de conexión en esta fase.
+
+declare(strict_types=1);
+
+// Alias para mantener compatibilidad con conexion_BD.php
+require_once __DIR__ . '/conexion_BD.php';
 

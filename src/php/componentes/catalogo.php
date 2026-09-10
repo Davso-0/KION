@@ -99,17 +99,26 @@ function formatearPrecio(float $precio): string
 
 <header class="topbar">
     <div class="topbar__marca">
-        <span class="topbar__logo">KION</span>
+        <a href="../modulos/home/home.php" class="topbar__logo" style="text-decoration: none; color: inherit;">KION</a>
         <span class="topbar__subtitulo">De gatos a vacas: alimento, medicamento y accesorios para cada especie que cuidamos.</span>
     </div>
 
-    <div class="topbar__carrito" aria-label="Carrito de venta">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-            <path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L20.5 8H6" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="10" cy="20" r="1.4"/>
-            <circle cx="17" cy="20" r="1.4"/>
-        </svg>
-        <span id="cart-count" class="topbar__carrito-conteo">0</span>
+    <div style="display: flex; align-items: center; gap: 14px;">
+        <a href="../modulos/home/home.php" class="topbar__btn-home" style="display: inline-flex; align-items: center; gap: 6px; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 0.9rem; padding: 7px 14px; border-radius: 10px; background: rgba(255, 255, 255, 0.14); transition: background 0.2s ease;">
+            🏠 Inicio
+        </a>
+        <a href="../modulos/home/dashboard.php" class="topbar__btn-dashboard" style="display: inline-flex; align-items: center; gap: 6px; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 0.9rem; padding: 7px 14px; border-radius: 10px; background: rgba(255, 255, 255, 0.14); transition: background 0.2s ease;">
+            📊 Dashboard
+        </a>
+
+        <div class="topbar__carrito" aria-label="Carrito de venta">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L20.5 8H6" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="10" cy="20" r="1.4"/>
+                <circle cx="17" cy="20" r="1.4"/>
+            </svg>
+            <span id="cart-count" class="topbar__carrito-conteo">0</span>
+        </div>
     </div>
 </header>
 
