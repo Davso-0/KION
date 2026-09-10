@@ -16,14 +16,14 @@
 
     <header class="header">
 
-        <div class="logo">
+        <a href="home.php" class="logo" style="text-decoration: none; color: inherit;">
             <div class="logo-icon">🐾</div>
 
             <div>
                 <div class="logo-principal">KION</div>
                 <div class="logo-subtitulo">VET. & AGROPECUARIO</div>
             </div>
-        </div>
+        </a>
 
 
         <!-- BUSCADOR -->
@@ -70,11 +70,11 @@
 
         <div class="nav-contenido">
 
-            <a href="#" class="nav-activo">Inicio</a>
+            <a href="home.php" class="nav-activo">Inicio</a>
 
-            <a href="#">Catálogo</a>
+            <a href="../../componentes/catalogo.php">Catálogo</a>
 
-            <a href="#">Nosotros</a>
+            <a href="dashboard.php">Dashboard Admin</a>
 
             <a href="#">Contacto</a>
 
@@ -120,7 +120,7 @@
 
                     <div class="hero-botones">
 
-                        <a href="#" class="btn-principal">
+                        <a href="../../componentes/catalogo.php" class="btn-principal">
                             Ver catálogo
                             <span>→</span>
                         </a>
@@ -241,7 +241,7 @@
 
                 <!-- VETERINARIA -->
 
-                <a href="#" class="categoria">
+                <a href="../../componentes/catalogo.php?categoria=Medicamento" class="categoria">
 
                     <div class="categoria-icono">
                         🩺
@@ -268,7 +268,7 @@
 
                 <!-- ALIMENTOS -->
 
-                <a href="#" class="categoria">
+                <a href="../../componentes/catalogo.php?categoria=Alimento" class="categoria">
 
                     <div class="categoria-icono">
                         🥣
@@ -295,7 +295,7 @@
 
                 <!-- AGROPECUARIO -->
 
-                <a href="#" class="categoria">
+                <a href="../../componentes/catalogo.php" class="categoria">
 
                     <div class="categoria-icono">
                         🌱
@@ -322,7 +322,7 @@
 
                 <!-- ACCESORIOS -->
 
-                <a href="#" class="categoria">
+                <a href="../../componentes/catalogo.php?categoria=Accesorios" class="categoria">
 
                     <div class="categoria-icono">
                         🦴
