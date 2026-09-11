@@ -151,7 +151,10 @@ $rutasImagenes = [
                     $precioTexto = formatearPrecio((float) $producto['precio']);
                     $nombre      = htmlspecialchars($producto['nombre'], ENT_QUOTES, 'UTF-8');
                     $idProd      = (int) $producto['id_producto'];
-                    $imgSrc      = $rutasImagenes[$idProd] ?? '../../img/default.jpg';
+                    
+                    // Si no tiene foto local, genera una elegante con el nombre de su categoría
+                    $textoPlaceholder = urlencode($producto['categoria']);
+                    $imgSrc = $rutasImagenes[$idProd] ?? "https://placehold.co/600x450/1A1815/C5A880?text={$textoPlaceholder}";
                 ?>
                 <article class="tarjeta">
                     <div class="tarjeta__glow"></div>
