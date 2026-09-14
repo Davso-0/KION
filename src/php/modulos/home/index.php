@@ -103,32 +103,31 @@
 
 
                     <h1>
-                        Todo para tus
-                        <br>
-                        animales, en un
-                        <br>
-                        solo lugar.
-                    </h1>
+    Tu negocio.
+    <br>
+    Tu control.
+    <br>
+    Tu KION.
+</h1>
 
-
-                    <p>
-                        Encuentra alimentos, medicamentos,
-                        accesorios, productos agropecuarios,
-                        soluciones para el cuidado de tus animales.
-                    </p>
+<p>
+    Deja atrás el desorden y toma el control de tu negocio.
+    KION reúne tus ventas, productos e inventario en un solo
+    lugar para que trabajes de forma más rápida, sencilla y organizada.
+</p>
 
 
                     <div class="hero-botones">
 
                         <a href="#" class="btn-principal">
-                            Ver catálogo
-                            <span>→</span>
-                        </a>
+    Conoce KION
+    <span>→</span>
+</a>
 
-                        <a href="#" class="btn-secundario">
-                            Conoce KION
-                            <span>→</span>
-                        </a>
+<a href="#" class="btn-secundario">
+    Descubre cómo funciona
+    <span>→</span>
+</a>
 
                     </div>
 
