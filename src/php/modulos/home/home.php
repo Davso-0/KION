@@ -44,7 +44,7 @@
 
         <div class="acciones">
 
-            <a href="#" class="accion">
+            <a href="../../../../inicioSesion.php" class="accion">
                 <span>♙</span>
                 Iniciar sesión
             </a>

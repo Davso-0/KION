@@ -31,6 +31,21 @@
             align-items: center;
             min-height: 100vh;
             padding: 20px;
+            animation: pageEnter .55s ease both;
+        }
+
+        body.page-exit {
+            animation: pageExit .36s ease both;
+        }
+
+        @keyframes pageEnter {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pageExit {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-8px); }
         }
 
         .auth-card {
@@ -158,16 +173,6 @@
         </div>
 
         <div class="form-group">
-            <label for="rol">Rol de Usuario</label>
-            <select id="rol" required>
-                <option value="" disabled selected>Selecciona un rol</option>
-                <option value="cajero">Cajero / Vendedor</option>
-                <option value="veterinario">Veterinario</option>
-                <option value="admin">Administrador</option>
-            </select>
-        </div>
-
-        <div class="form-group">
             <label for="password">Contraseña</label>
             <input type="password" id="password" placeholder="••••••••" required>
         </div>
@@ -181,9 +186,19 @@
     </form>
 
     <div class="form-footer">
-        ¿Ya tienes una cuenta? <a href="login.php">Inicia Sesión</a>
+        ¿Ya tienes una cuenta? <a href="inicioSesion.php">Inicia Sesión</a>
     </div>
 </div>
+
+<script>
+    document.querySelectorAll('a[href="inicioSesion.php"]').forEach((enlace) => {
+        enlace.addEventListener('click', (evento) => {
+            evento.preventDefault();
+            document.body.classList.add('page-exit');
+            setTimeout(() => { window.location.href = enlace.href; }, 360);
+        });
+    });
+</script>
 
 </body>
 </html>
