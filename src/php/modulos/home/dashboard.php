@@ -154,6 +154,7 @@ if(isset($pdo)){
                 <li class="nav-item"><a class="nav-link nav-trigger" href="#inventario" data-view="inventario"><span class="nav-icon">▤</span><span class="nav-label">Inventario</span></a></li>
                 <li class="nav-item"><a class="nav-link nav-trigger" href="#productos" data-view="productos"><span class="nav-icon">□</span><span class="nav-label">Productos</span><span class="nav-badge"><?= $tp ?></span></a></li>
                 <li class="nav-item"><a class="nav-link nav-trigger" href="#ventas" data-view="ventas"><span class="nav-icon">↗</span><span class="nav-label">Ventas</span></a></li>
+</a>
             </ul>
         </div>
         <div class="sidebar-foot"><div class="mini-avatar">AG</div><div class="sidebar-foot-text"><b>Administración</b><span>Panel general</span></div></div>

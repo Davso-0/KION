@@ -64,7 +64,7 @@
     </header>
 
 
-    <!-- ================= NAVBAR ================= -->
+    <!-- ==================== NAVBAR ==================== -->
 
     <nav class="navbar">
 
@@ -75,6 +75,8 @@
             <a href="../../componentes/catalogo.php">Catálogo</a>
 
             <a href="dashboard.php">Dashboard Admin</a>
+
+            <a href="/KION/src/php/cobranza/cobranza.php">Cobranza</a>
 
             <a href="#">Contacto</a>
 
