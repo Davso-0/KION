@@ -302,7 +302,6 @@ if(isset($pdo)){
         .nav-link:hover{ background: oklch(100% 0 0 / 0.07); color: var(--cream-050); transform: translateX(2px); }
         .nav-item.active .nav-link{ background: linear-gradient(100deg, oklch(60% 0.06 70 / 0.9), oklch(55% 0.05 45 / 0.85)); color: var(--cream-050); box-shadow: var(--shadow-sm), inset 0 1px 0 oklch(100% 0 0 / 0.08); }
         .nav-item.active .nav-link::before{ content: ''; position: absolute; left: -16px; top: 50%; transform: translateY(-50%); width: 4px; height: 22px; border-radius: var(--r-pill); background: var(--honey); }
-        .nav-badge{ margin-left: auto; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: var(--r-pill); background: var(--rose); color: var(--coffee-950); }
         .sidebar-scroll{ flex: 1; overflow-y: auto; overflow-x: hidden; margin: 0 -6px; padding: 0 6px; }
         
         .sidebar-collapse-btn{ position: absolute; top: 30px; right: -13px; width: 26px; height: 26px; border-radius: 50%; background: var(--bg-surface-raised); border: 1px solid var(--border-soft); color: var(--coffee-700); display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow-sm); z-index: 41; }
@@ -450,12 +449,12 @@ if(isset($pdo)){
                 <li class="nav-item active"><a class="nav-link nav-trigger" href="#general" data-view="general"><span class="nav-icon">▦</span><span class="nav-label">Resumen general</span></a></li>
             </ul>
             <div class="nav-section-title" style="margin-top:20px">Gestión</div>
-            <ul class="nav-list">
-                <li class="nav-item"><a class="nav-link nav-trigger" href="#sucursales" data-view="sucursales"><span class="nav-icon">⌂</span><span class="nav-label">Sucursales</span><span class="nav-badge" id="badgeSucursales"><?= $ts ?></span></a></li>
-                <li class="nav-item"><a class="nav-link nav-trigger" href="#usuarios" data-view="usuarios"><span class="nav-icon">♙</span><span class="nav-label">Personal</span></a></li>
-                <li class="nav-item"><a class="nav-link nav-trigger" href="#inventario" data-view="inventario"><span class="nav-icon">▤</span><span class="nav-label">Inventario</span></a></li>
-                <li class="nav-item"><a class="nav-link nav-trigger" href="#productos" data-view="productos"><span class="nav-icon">□</span><span class="nav-label">Productos</span><span class="nav-badge" id="badgeProductos"><?= $tp ?></span></a></li>
-                <li class="nav-item"><a class="nav-link nav-trigger" href="#ventas" data-view="ventas"><span class="nav-icon">↗</span><span class="nav-label">Ventas</span></a></li>
+           <ul class="nav-list">
+    <li class="nav-item"><a class="nav-link nav-trigger" href="#sucursales" data-view="sucursales"><span class="nav-icon">⌂</span><span class="nav-label">Sucursales</span></a></li>
+    <li class="nav-item"><a class="nav-link nav-trigger" href="#usuarios" data-view="usuarios"><span class="nav-icon">♙</span><span class="nav-label">Personal</span></a></li>
+    <li class="nav-item"><a class="nav-link nav-trigger" href="#inventario" data-view="inventario"><span class="nav-icon">▤</span><span class="nav-label">Inventario</span></a></li>
+    <li class="nav-item"><a class="nav-link nav-trigger" href="#productos" data-view="productos"><span class="nav-icon">□</span><span class="nav-label">Productos</span></a></li>
+    <li class="nav-item"><a class="nav-link nav-trigger" href="#ventas" data-view="ventas"><span class="nav-icon">↗</span><span class="nav-label">Ventas</span></a></li>
             </ul>
         </div>
     </aside>
