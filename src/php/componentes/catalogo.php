@@ -152,9 +152,18 @@ $rutasImagenes = [
                     $nombre      = htmlspecialchars($producto['nombre'], ENT_QUOTES, 'UTF-8');
                     $idProd      = (int) $producto['id_producto'];
                     
-                    // Si no tiene foto local, genera una elegante con el nombre de su categoría
-                    $textoPlaceholder = urlencode($producto['categoria']);
-                    $imgSrc = $rutasImagenes[$idProd] ?? "https://placehold.co/600x450/1A1815/C5A880?text={$textoPlaceholder}";
+                    $rutaAutomatica = "../../img/{$idProd}.jpg";
+
+                    if (isset($rutasImagenes[$idProd])) {
+                        $imgSrc = $rutasImagenes[$idProd];
+                    } 
+                    elseif (file_exists($rutaAutomatica)) {
+                        $imgSrc = $rutaAutomatica;
+                    } 
+                    else {
+                        $textoPlaceholder = urlencode($producto['categoria']);
+                        $imgSrc = "https://placehold.co/600x450/1A1815/C5A880?text={$textoPlaceholder}";
+                    }
                 ?>
                 <article class="tarjeta">
                     <div class="tarjeta__glow"></div>
@@ -184,6 +193,22 @@ $rutasImagenes = [
         <?php endif; ?>
     </main>
 </div>
+
+<div id="cart-overlay" class="cart-overlay"></div>
+<aside id="cart-panel" class="cart-panel">
+    <div class="cart-panel__header">
+        <h2>Tu Carrito</h2>
+        <button id="close-cart" class="cart-panel__close">&times;</button>
+    </div>
+    <div id="cart-items" class="cart-panel__items"></div>
+    <div class="cart-panel__footer">
+        <div class="cart-panel__total">
+            <span>Total:</span>
+            <span id="cart-total">$0.00 MXN</span>
+        </div>
+        <button class="cart-panel__checkout">Proceder al pago</button>
+    </div>
+</aside>
 
 <div id="toast-container" aria-live="polite"></div>
 <script src="../../js/catalogo.js" defer></script>
