@@ -233,6 +233,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             line-height: 1.4;
         }
 
+        #passwordGuidance {
+            display: none;
+        }
+
+        #passwordGuidance.visible {
+            display: block;
+        }
+
         .password-rules {
             display: grid;
             gap: 3px;
@@ -392,12 +400,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="form-group">
             <label for="password">Contraseña</label>
             <input type="password" id="password" name="password" placeholder="••••••••" minlength="8" pattern="(?=.*[A-Z])(?=.*[0-9]).{8,}" title="Debe tener al menos 8 caracteres, una mayúscula y un número" required>
-            <small class="password-help">Tu contraseña debe cumplir estos requisitos:</small>
-            <ul class="password-rules" aria-label="Requisitos de la contraseña">
-                <li data-rule="length">8 caracteres como mínimo</li>
-                <li data-rule="uppercase">Una letra mayúscula</li>
-                <li data-rule="number">Un número</li>
-            </ul>
+            <div id="passwordGuidance">
+                <small class="password-help">Tu contraseña debe cumplir estos requisitos:</small>
+                <ul class="password-rules" aria-label="Requisitos de la contraseña">
+                    <li data-rule="length">8 caracteres como mínimo</li>
+                    <li data-rule="uppercase">Una letra mayúscula</li>
+                    <li data-rule="number">Un número</li>
+                </ul>
+            </div>
         </div>
 
         <div class="form-group">
@@ -425,6 +435,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     const registerForm = document.getElementById('registerForm');
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
+    const passwordGuidance = document.getElementById('passwordGuidance');
     const confirmPasswordInput = document.getElementById('confirm_password');
     const formMessageOverlay = document.getElementById('formMessageOverlay');
     const formMessage = document.getElementById('formMessage');
@@ -442,6 +453,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     passwordInput.addEventListener('input', updatePasswordRules);
+    passwordInput.addEventListener('focus', () => {
+        passwordGuidance.classList.add('visible');
+    });
+    passwordInput.addEventListener('blur', () => {
+        passwordGuidance.classList.remove('visible');
+    });
     confirmPasswordInput.addEventListener('input', () => {
         confirmPasswordError.classList.remove('visible');
     });
@@ -470,7 +487,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!emailInput.value.trim()) errors.push('Escribe tu correo electrónico.');
         else if (!emailInput.validity.valid) errors.push('Escribe un correo electrónico válido.');
         if (!passwordInput.value) errors.push('Crea una contraseña.');
-        else if (!passwordIsValid) errors.push('La contraseña necesita 8 caracteres, una mayúscula y un número.');
+        else if (!passwordIsValid) {
+            errors.push('La contraseña necesita 8 caracteres, una mayúscula y un número.');
+            passwordGuidance.classList.add('visible');
+        }
         if (!confirmPasswordInput.value) errors.push('Confirma tu contraseña.');
         else if (!passwordsMatch) errors.push('Las contraseñas no coinciden.');
 
