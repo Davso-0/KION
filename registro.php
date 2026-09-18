@@ -274,26 +274,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .form-message {
-            display: none;
-            margin: 14px 0 0;
-            padding: 10px 12px;
+            position: relative;
+            width: min(320px, calc(100% - 40px));
+            margin: 0;
+            padding: 24px 22px 20px;
             border: 1px solid rgba(102, 178, 123, 0.55);
-            border-radius: 8px;
+            border-radius: 14px;
             background: rgba(55, 130, 75, 0.18);
             color: #b9e8c4;
             font-size: 12px;
             text-align: center;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
+            backdrop-filter: blur(18px);
         }
 
-        .form-message.visible {
-            display: block;
+        .form-message-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, .62);
+            backdrop-filter: blur(5px);
+        }
+
+        .form-message-overlay.visible {
+            display: flex;
             animation: messageEnter .3s ease both;
+        }
+
+        .form-message-overlay .form-message {
+            display: block;
         }
 
         .form-message.error {
             border-color: rgba(239, 170, 165, .55);
             background: rgba(130, 55, 55, .2);
             color: #efaaa5;
+            text-align: left;
+        }
+
+        .form-message-close {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
+            border: 0;
+            background: transparent;
+            color: currentColor;
+            cursor: pointer;
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .form-message-title {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 700;
+        }
+
+        .form-message-list {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        .form-message-list li + li {
+            margin-top: 3px;
         }
 
         @media (max-width: 640px) {
@@ -360,19 +409,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <button type="submit" class="btn-submit">Registrar Usuario</button>
     </form>
 
-    <div class="form-message<?= $registroExitoso ? ' visible' : ($registroMensaje !== '' ? ' visible error' : '') ?>" id="formMessage" role="status" aria-live="polite">
-        <?= htmlspecialchars($registroMensaje, ENT_QUOTES, 'UTF-8') ?>
-    </div>
-
     <div class="form-footer">
         ¿Ya tienes una cuenta? <a href="inicioSesion.php">Inicia Sesión</a>
     </div>
 </div>
 
+<div class="form-message-overlay<?= $registroMensaje !== '' && !$registroExitoso ? ' visible' : '' ?>" id="formMessageOverlay">
+    <div class="form-message error" id="formMessage" role="status" aria-live="polite">
+        <button class="form-message-close" type="button" aria-label="Cerrar notificación">&times;</button>
+        <?= htmlspecialchars($registroMensaje, ENT_QUOTES, 'UTF-8') ?>
+    </div>
+</div>
+
 <script>
     const registerForm = document.getElementById('registerForm');
+    const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const confirmPasswordInput = document.getElementById('confirm_password');
+    const formMessageOverlay = document.getElementById('formMessageOverlay');
     const formMessage = document.getElementById('formMessage');
     const confirmPasswordError = document.getElementById('confirmPasswordError');
     const passwordRules = {
@@ -392,16 +446,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         confirmPasswordError.classList.remove('visible');
     });
 
+    function showValidationMessage(errors) {
+        formMessage.className = 'form-message error';
+        formMessage.innerHTML = `<button class="form-message-close" type="button" aria-label="Cerrar notificación">&times;</button><strong class="form-message-title">Revisa tu registro</strong><ul class="form-message-list">${errors.map(error => `<li>${error}</li>`).join('')}</ul>`;
+        formMessageOverlay.classList.add('visible');
+    }
+
+    formMessageOverlay.addEventListener('click', (evento) => {
+        if (evento.target === formMessageOverlay || evento.target.closest('.form-message-close')) formMessageOverlay.classList.remove('visible');
+    });
+
+    document.addEventListener('keydown', (evento) => {
+        if (evento.key === 'Escape') formMessageOverlay.classList.remove('visible');
+    });
+
     registerForm.addEventListener('submit', (evento) => {
         updatePasswordRules();
         const passwordIsValid = Object.values(passwordRules).every(check => check(passwordInput.value));
-        const fieldsAreFilled = registerForm.checkValidity();
         const passwordsMatch = passwordInput.value === confirmPasswordInput.value;
+        const errors = [];
+
+        if (!document.getElementById('nombre').value.trim()) errors.push('Escribe tu nombre completo.');
+        if (!emailInput.value.trim()) errors.push('Escribe tu correo electrónico.');
+        else if (!emailInput.validity.valid) errors.push('Escribe un correo electrónico válido.');
+        if (!passwordInput.value) errors.push('Crea una contraseña.');
+        else if (!passwordIsValid) errors.push('La contraseña necesita 8 caracteres, una mayúscula y un número.');
+        if (!confirmPasswordInput.value) errors.push('Confirma tu contraseña.');
+        else if (!passwordsMatch) errors.push('Las contraseñas no coinciden.');
+
         confirmPasswordError.classList.toggle('visible', !passwordsMatch && confirmPasswordInput.value.length > 0);
 
-        if (!fieldsAreFilled || !passwordIsValid || !passwordsMatch) {
+        if (errors.length > 0) {
             evento.preventDefault();
-            formMessage.classList.remove('visible');
+            showValidationMessage(errors);
             return;
         }
     });
