@@ -45,8 +45,6 @@
         .form-footer { margin-top: 24px; color: var(--muted); font-size: 13px; text-align: center; }
         .form-footer a { color: var(--gold); font-weight: 700; text-decoration: none; }
         .form-footer a:hover { text-decoration: underline; }
-        #activarSonido { position: fixed; bottom: 24px; left: 24px; padding: 11px 16px; border: 1px solid rgba(255, 255, 255, .65); border-radius: 6px; background: rgba(0, 0, 0, .6); color: #fff; cursor: pointer; font-size: 14px; }
-
         @media (max-width: 640px) {
             .login-panel { width: 100%; max-width: 430px; padding: 32px 24px; background: linear-gradient(90deg, rgba(18, 18, 18, .3) 0%, rgba(18, 18, 18, .58) 30%, rgba(18, 18, 18, .86) 70%, rgba(18, 18, 18, .94) 100%); }
             .brand { margin-bottom: 28px; }
@@ -55,7 +53,7 @@
 </head>
 <body>
     <video id="videoFondo" autoplay muted loop playsinline>
-        <source src="src/videoEJEMPLO/22.mp4" type="video/mp4">
+        <source src="src/videoEJEMPLO/20.mp4" type="video/mp4">
     </video>
     <div class="velo"></div>
 
@@ -88,31 +86,7 @@
         </div>
     </aside>
 
-    <button id="activarSonido" type="button">Añadir sonido</button>
-
     <script>
-        const video = document.getElementById('videoFondo');
-        const botonSonido = document.getElementById('activarSonido');
-
-        botonSonido.addEventListener('click', async () => {
-            if (!video.muted) {
-                video.muted = true;
-                botonSonido.textContent = 'Añadir sonido';
-                return;
-            }
-
-            video.muted = false;
-            video.defaultMuted = false;
-            video.volume = 1;
-            try {
-                await video.play();
-                botonSonido.textContent = 'Quitar sonido';
-            } catch (error) {
-                video.muted = true;
-                botonSonido.textContent = 'Añadir sonido';
-            }
-        });
-
         document.querySelectorAll('a[href="registro.php"]').forEach((enlace) => {
             enlace.addEventListener('click', (evento) => {
                 evento.preventDefault();
