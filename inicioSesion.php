@@ -1,3 +1,68 @@
+<?php
+session_start();
+$loginError = $_SESSION['login_error'] ?? '';
+unset($_SESSION['login_error']);
+$esPeticionAjax = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_once __DIR__ . '/src/php/config/conexion_BD.php';
+
+    $correo = trim($_POST['correo'] ?? '');
+    $contrasena = $_POST['contrasena'] ?? '';
+
+    if ($pdo === null) {
+        $loginError = $errorConexion ?? 'No fue posible conectar con la base de datos.';
+    } elseif (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+        $loginError = 'Escribe un correo electrónico válido.';
+    } elseif ($contrasena === '') {
+        $loginError = 'Escribe tu contraseña.';
+    } else {
+        $consulta = $pdo->prepare('SELECT u.id_usuario, u.nombre, u.apellido, u.correo, u.password_hash, u.id_rol, u.id_sucursal, u.estado, r.nombre AS rol FROM usuarios u INNER JOIN roles r ON r.id_rol = u.id_rol WHERE u.correo = ? LIMIT 1');
+        $consulta->execute([$correo]);
+        $usuario = $consulta->fetch();
+
+        if (!$usuario) {
+            $loginError = 'La contraseña o correo electrónico no son correctos.';
+        } elseif ($usuario['estado'] !== 'ACTIVO') {
+            $loginError = 'Esta cuenta se encuentra inactiva.';
+        } elseif (!password_verify($contrasena, $usuario['password_hash'])) {
+            $loginError = 'La contraseña o correo electrónico no son correctos.';
+        } else {
+            session_regenerate_id(true);
+            $_SESSION['usuario'] = [
+                'id_usuario' => $usuario['id_usuario'],
+                'nombre' => $usuario['nombre'],
+                'apellido' => $usuario['apellido'],
+                'correo' => $usuario['correo'],
+                'id_rol' => $usuario['id_rol'],
+                'id_sucursal' => $usuario['id_sucursal'],
+                'rol' => $usuario['rol'],
+            ];
+            $destino = $usuario['rol'] === 'Usuario'
+                ? 'src/php/componentes/catalogo.php'
+                : 'src/php/modulos/home/dashboard.php';
+            if ($esPeticionAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => true, 'redirect' => $destino]);
+                exit;
+            }
+            header('Location: ' . $destino);
+            exit;
+        }
+    }
+
+    if ($loginError !== '') {
+        if ($esPeticionAjax) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'message' => $loginError]);
+            exit;
+        }
+        $_SESSION['login_error'] = $loginError;
+        header('Location: inicioSesion.php');
+        exit;
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -45,8 +110,13 @@
         .form-footer { margin-top: 24px; color: var(--muted); font-size: 13px; text-align: center; }
         .form-footer a { color: var(--gold); font-weight: 700; text-decoration: none; }
         .form-footer a:hover { text-decoration: underline; }
-        #activarSonido { position: fixed; bottom: 24px; left: 24px; padding: 11px 16px; border: 1px solid rgba(255, 255, 255, .65); border-radius: 6px; background: rgba(0, 0, 0, .6); color: #fff; cursor: pointer; font-size: 14px; }
-
+        .login-message-overlay { display: none; position: fixed; inset: 0; z-index: 20; align-items: flex-start; justify-content: center; padding: 28px 20px; pointer-events: none; }
+        .login-message-overlay.visible { display: flex; animation: pageEnter .3s ease both; }
+        .login-message { position: relative; width: min(320px, calc(100% - 40px)); padding: 20px 22px 16px; border: 1px solid rgba(239, 170, 165, .55); border-radius: 12px; background: rgba(70, 30, 30, .96); color: #efaaa5; font-size: 13px; text-align: left; box-shadow: 0 12px 30px rgba(0, 0, 0, .45); pointer-events: auto; }
+        .login-message-title { display: block; margin-bottom: 5px; font-weight: 700; }
+        .login-message-list { margin: 0; padding-left: 18px; }
+        .login-message-list li + li { margin-top: 3px; }
+        .login-message-close { position: absolute; top: 8px; right: 10px; width: 24px; height: 24px; border: 0; background: transparent; color: currentColor; cursor: pointer; font-size: 20px; line-height: 1; }
         @media (max-width: 640px) {
             .login-panel { width: 100%; max-width: 430px; padding: 32px 24px; background: linear-gradient(90deg, rgba(18, 18, 18, .3) 0%, rgba(18, 18, 18, .58) 30%, rgba(18, 18, 18, .86) 70%, rgba(18, 18, 18, .94) 100%); }
             .brand { margin-bottom: 28px; }
@@ -55,7 +125,7 @@
 </head>
 <body>
     <video id="videoFondo" autoplay muted loop playsinline>
-        <source src="src/videoEJEMPLO/17.mp4" type="video/mp4">
+        <source src="src/videoEJEMPLO/20.mp4" type="video/mp4">
     </video>
     <div class="velo"></div>
 
@@ -66,7 +136,7 @@
                 <div class="brand-subtitle">Vet & Agropecuario</div>
             </header>
 
-            <form onsubmit="event.preventDefault();">
+            <form id="loginForm" method="post" novalidate>
                 <h2 class="form-title">Iniciar Sesion</h2>
 
                 <div class="form-group">
@@ -88,29 +158,63 @@
         </div>
     </aside>
 
-    <button id="activarSonido" type="button">Añadir sonido</button>
+    <div class="login-message-overlay<?= $loginError !== '' ? ' visible' : '' ?>" id="loginMessageOverlay">
+        <div class="login-message" id="loginMessage" role="alert" aria-live="assertive">
+            <?php if ($loginError !== ''): ?>
+                <button class="login-message-close" type="button" aria-label="Cerrar notificación">&times;</button>
+                <strong class="login-message-title">No se pudo iniciar sesión</strong>
+                <ul class="login-message-list"><li><?= htmlspecialchars($loginError, ENT_QUOTES, 'UTF-8') ?></li></ul>
+            <?php endif; ?>
+        </div>
+    </div>
 
     <script>
-        const video = document.getElementById('videoFondo');
-        const botonSonido = document.getElementById('activarSonido');
+        const loginForm = document.getElementById('loginForm');
+        const correoInput = document.getElementById('correo');
+        const contrasenaInput = document.getElementById('contrasena');
+        const loginMessageOverlay = document.getElementById('loginMessageOverlay');
+        const loginMessage = document.getElementById('loginMessage');
 
-        botonSonido.addEventListener('click', async () => {
-            if (!video.muted) {
-                video.muted = true;
-                botonSonido.textContent = 'Añadir sonido';
+        function showLoginMessage(errors) {
+            loginMessage.innerHTML = `<button class="login-message-close" type="button" aria-label="Cerrar notificación">&times;</button><strong class="login-message-title">Revisa tu inicio de sesión</strong><ul class="login-message-list">${errors.map(error => `<li>${error}</li>`).join('')}</ul>`;
+            loginMessageOverlay.classList.add('visible');
+        }
+
+        loginForm.addEventListener('submit', (evento) => {
+            evento.preventDefault();
+            const errors = [];
+
+            if (!correoInput.value.trim()) errors.push('Escribe tu correo electrónico.');
+            else if (!correoInput.validity.valid) errors.push('Escribe un correo electrónico válido.');
+            if (!contrasenaInput.value) errors.push('Escribe tu contraseña.');
+
+            if (errors.length > 0) {
+                showLoginMessage(errors);
                 return;
             }
 
-            video.muted = false;
-            video.defaultMuted = false;
-            video.volume = 1;
-            try {
-                await video.play();
-                botonSonido.textContent = 'Quitar sonido';
-            } catch (error) {
-                video.muted = true;
-                botonSonido.textContent = 'Añadir sonido';
-            }
+            fetch(window.location.href, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: new FormData(loginForm)
+            })
+                .then(respuesta => respuesta.json())
+                .then(resultado => {
+                    if (resultado.ok) {
+                        window.location.href = resultado.redirect;
+                        return;
+                    }
+                    showLoginMessage([resultado.message || 'No fue posible iniciar sesión.']);
+                })
+                .catch(() => showLoginMessage(['No fue posible conectar con el servidor.']));
+        });
+
+        loginMessageOverlay.addEventListener('click', (evento) => {
+            if (evento.target === loginMessageOverlay || evento.target.closest('.login-message-close')) loginMessageOverlay.classList.remove('visible');
+        });
+
+        document.addEventListener('keydown', (evento) => {
+            if (evento.key === 'Escape') loginMessageOverlay.classList.remove('visible');
         });
 
         document.querySelectorAll('a[href="registro.php"]').forEach((enlace) => {

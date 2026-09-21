@@ -1353,7 +1353,7 @@
             Nosotros
         </a>
 
-        <a href="#" class="btn-login">
+        <a href="../../../../inicioSesion.php" class="btn-login">
             Iniciar sesión
         </a>
 
