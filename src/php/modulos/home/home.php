@@ -108,6 +108,45 @@
 
 
         /* =====================================================
+           BOTÓN MODO OSCURO
+        ===================================================== */
+
+        .dark-mode-btn {
+            border: 1px solid #8d6045;
+
+            background: #fffaf6;
+
+            color: #563827;
+
+            width: 42px;
+            height: 42px;
+
+            border-radius: 50%;
+
+            cursor: pointer;
+
+            font-size: 18px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            transition: .3s;
+        }
+
+
+        .dark-mode-btn:hover {
+            background: #8d6045;
+
+            color: white;
+
+            transform: scale(1.08);
+        }
+
+
+        /* =====================================================
            HERO
         ===================================================== */
 
@@ -1212,6 +1251,409 @@
 
 
         /* =====================================================
+           MODO OSCURO
+        ===================================================== */
+
+        body.dark-mode {
+            background: #171311;
+            color: #eeeeee;
+        }
+
+
+        /* NAVBAR */
+
+        body.dark-mode .navbar {
+            background: #211b18;
+            border-bottom: 1px solid #3b302a;
+        }
+
+
+        body.dark-mode .logo {
+            color: #e4c6b0;
+        }
+
+
+        body.dark-mode .logo span {
+            color: #c18b67;
+        }
+
+
+        body.dark-mode .menu a {
+            color: #ded7d2;
+        }
+
+
+        body.dark-mode .menu a:hover {
+            color: #d09a75;
+        }
+
+
+        body.dark-mode .btn-login {
+            border-color: #a87959;
+        }
+
+
+        body.dark-mode .dark-mode-btn {
+            background: #30251f;
+            color: #f3d4bc;
+            border-color: #a87959;
+        }
+
+
+        /* HERO */
+
+        body.dark-mode .hero {
+            background:
+                radial-gradient(
+                    circle at 85% 20%,
+                    #493428,
+                    transparent 30%
+                ),
+                #171311;
+        }
+
+
+        body.dark-mode .tag {
+            background: #3b2b23;
+            color: #d9a984;
+        }
+
+
+        body.dark-mode .hero h1 {
+            color: #f1e9e4;
+        }
+
+
+        body.dark-mode .hero h1 span {
+            color: #d19a74;
+        }
+
+
+        body.dark-mode .hero p {
+            color: #c0b7b1;
+        }
+
+
+        body.dark-mode .btn-secondary {
+            color: #e1b99b;
+            border-color: #80604c;
+        }
+
+
+        body.dark-mode .btn-secondary:hover {
+            background: #3a2b23;
+        }
+
+
+        /* DASHBOARD */
+
+        body.dark-mode .dashboard {
+            background: #24201e;
+            border-color: #403731;
+
+            box-shadow:
+                0 30px 70px rgba(0, 0, 0, .45);
+        }
+
+
+        body.dark-mode .dashboard-title {
+            color: #eee4dd;
+        }
+
+
+        body.dark-mode .stat {
+            background: #302925;
+        }
+
+
+        body.dark-mode .stat small {
+            color: #aaa09a;
+        }
+
+
+        body.dark-mode .stat strong {
+            color: #eee4dd;
+        }
+
+
+        body.dark-mode .chart,
+        body.dark-mode .inventory {
+            background: #2b2522;
+        }
+
+
+        body.dark-mode .chart h4,
+        body.dark-mode .inventory h4 {
+            color: #e7ddd6;
+        }
+
+
+        body.dark-mode .inventory-item {
+            border-color: #403832;
+        }
+
+
+        /* INTRO */
+
+        body.dark-mode .intro {
+            background: #171311;
+            color: #aaa19b;
+        }
+
+
+        body.dark-mode .intro strong {
+            color: #d2aa8e;
+        }
+
+
+        /* FUNCIONES */
+
+        body.dark-mode .features-section {
+            background: #201b18;
+        }
+
+
+        body.dark-mode .section-title {
+            color: #eee7e2;
+        }
+
+
+        body.dark-mode .section-description {
+            color: #b9b0aa;
+        }
+
+
+        body.dark-mode .feature-card {
+            background: #292421;
+            border-color: #403731;
+        }
+
+
+        body.dark-mode .feature-card h3 {
+            color: #e9dfd8;
+        }
+
+
+        body.dark-mode .feature-card p {
+            color: #b4aaa4;
+        }
+
+
+        body.dark-mode .feature-icon {
+            background: #3b2c24;
+        }
+
+
+        /* VETERINARIA */
+
+        body.dark-mode .vet-section {
+            background: #1b1715;
+        }
+
+
+        body.dark-mode .vet-text h2 {
+            color: #eee6e1;
+        }
+
+
+        body.dark-mode .vet-text p {
+            color: #b9b0aa;
+        }
+
+
+        body.dark-mode .check-list li {
+            color: #d0c6c0;
+        }
+
+
+        body.dark-mode .vet-card {
+            background: #292421;
+        }
+
+
+        body.dark-mode .vet-card h3 {
+            color: #eee4dd;
+        }
+
+
+        body.dark-mode .vet-row {
+            border-color: #413832;
+            color: #d6cec8;
+        }
+
+
+        body.dark-mode .vet-icon {
+            background: #49352a;
+        }
+
+
+        /* VENTAS */
+
+        body.dark-mode .sales-section {
+            background: #171311;
+        }
+
+
+        body.dark-mode .sale-screen {
+            background: #292421;
+        }
+
+
+        body.dark-mode .sale-screen h3 {
+            color: #eee4dd;
+        }
+
+
+        body.dark-mode .sale-item {
+            border-color: #413832;
+            color: #d6cec8;
+        }
+
+
+        body.dark-mode .sale-total {
+            color: #d6a27d;
+        }
+
+
+        body.dark-mode .sales-text h2 {
+            color: #eee6e1;
+        }
+
+
+        body.dark-mode .sales-text p {
+            color: #b9b0aa;
+        }
+
+
+        /* INVENTARIO */
+
+        body.dark-mode .inventory-section {
+            background: #1b1715;
+        }
+
+
+        body.dark-mode .inventory-text h2 {
+            color: #eee6e1;
+        }
+
+
+        body.dark-mode .inventory-text p {
+            color: #b9b0aa;
+        }
+
+
+        body.dark-mode .inventory-visual {
+            background: #292421;
+
+            box-shadow:
+                0 15px 40px rgba(0,0,0,.35);
+        }
+
+
+        body.dark-mode .table-header {
+            color: #d5a27e;
+        }
+
+
+        body.dark-mode .table-header,
+        body.dark-mode .table-row {
+            border-color: #413832;
+        }
+
+
+        body.dark-mode .table-row {
+            color: #d5cec8;
+        }
+
+
+        /* SUCURSALES */
+
+        body.dark-mode .branches {
+            background: #201b18;
+        }
+
+
+        body.dark-mode .branch {
+            background: #292421;
+            border-color: #403731;
+        }
+
+
+        body.dark-mode .branch h3 {
+            color: #eee4dd;
+        }
+
+
+        body.dark-mode .branch p {
+            color: #b8aea8;
+        }
+
+
+        /* PASOS */
+
+        body.dark-mode .steps {
+            background: #171311;
+        }
+
+
+        body.dark-mode .step {
+            background: #292421;
+            border-color: #403731;
+        }
+
+
+        body.dark-mode .step h3 {
+            color: #eee4dd;
+        }
+
+
+        body.dark-mode .step p {
+            color: #b8aea8;
+        }
+
+
+        /* BENEFICIOS */
+
+        body.dark-mode .benefits {
+            background: #302620;
+        }
+
+
+        body.dark-mode .benefit strong {
+            color: #eadbd1;
+        }
+
+
+        body.dark-mode .benefit p {
+            color: #bdb2ab;
+        }
+
+
+        /* CTA */
+
+        body.dark-mode .cta {
+            background:
+                linear-gradient(
+                    135deg,
+                    #211813,
+                    #493024
+                );
+        }
+
+
+        /* FOOTER */
+
+        body.dark-mode footer {
+            background: #0e0b0a;
+        }
+
+
+        body.dark-mode footer p {
+            color: #aaa09a;
+        }
+
+
+        /* =====================================================
            RESPONSIVE
         ===================================================== */
 
@@ -1356,6 +1798,13 @@
         <a href="#" class="btn-login">
             Iniciar sesión
         </a>
+
+        <!-- BOTÓN MODO OSCURO -->
+        <button id="darkModeBtn" class="dark-mode-btn" title="Cambiar modo">
+
+            🌙
+
+        </button>
 
     </nav>
 
@@ -2418,6 +2867,36 @@
 
 
 </footer>
+
+
+
+<!-- =====================================================
+     JAVASCRIPT MODO OSCURO
+===================================================== -->
+
+<script>
+
+    const darkModeBtn = document.getElementById("darkModeBtn");
+
+
+    darkModeBtn.addEventListener("click", function () {
+
+        document.body.classList.toggle("dark-mode");
+
+
+        if (document.body.classList.contains("dark-mode")) {
+
+            darkModeBtn.innerHTML = "☀️";
+
+        } else {
+
+            darkModeBtn.innerHTML = "🌙";
+
+        }
+
+    });
+
+</script>
 
 
 </body>
