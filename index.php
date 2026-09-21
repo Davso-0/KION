@@ -1,4 +1,5 @@
 <?php
-// Punto de entrada principal de KION.
-// Las rutas y módulos se integrarán en fases posteriores.
+// Redireccionar automáticamente al Home de KION
+header('Location: src/php/modulos/home/home.php');
+exit;
 
