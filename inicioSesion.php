@@ -110,13 +110,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .form-footer { margin-top: 24px; color: var(--muted); font-size: 13px; text-align: center; }
         .form-footer a { color: var(--gold); font-weight: 700; text-decoration: none; }
         .form-footer a:hover { text-decoration: underline; }
-        .login-message-overlay { display: none; position: fixed; inset: 0; z-index: 20; align-items: flex-start; justify-content: center; padding: 28px 20px; pointer-events: none; }
-        .login-message-overlay.visible { display: flex; animation: pageEnter .3s ease both; }
-        .login-message { position: relative; width: min(320px, calc(100% - 40px)); padding: 20px 22px 16px; border: 1px solid rgba(239, 170, 165, .55); border-radius: 12px; background: rgba(70, 30, 30, .96); color: #efaaa5; font-size: 13px; text-align: left; box-shadow: 0 12px 30px rgba(0, 0, 0, .45); pointer-events: auto; }
-        .login-message-title { display: block; margin-bottom: 5px; font-weight: 700; }
-        .login-message-list { margin: 0; padding-left: 18px; }
-        .login-message-list li + li { margin-top: 3px; }
-        .login-message-close { position: absolute; top: 8px; right: 10px; width: 24px; height: 24px; border: 0; background: transparent; color: currentColor; cursor: pointer; font-size: 20px; line-height: 1; }
+        .role-demo-link { display: block; margin-top: 12px; color: rgba(255, 255, 255, .58); font-size: 12px; text-align: center; text-decoration: none; }
+        .role-demo-link:hover { color: var(--gold); text-decoration: underline; }
+        .role-overlay { display: none; position: fixed; inset: 0; z-index: 20; align-items: center; justify-content: center; padding: 20px; background: rgba(0, 0, 0, .58); backdrop-filter: blur(5px); }
+        .role-overlay.visible { display: flex; animation: pageEnter .25s ease both; }
+        .role-picker { position: relative; width: min(330px, calc(100% - 40px)); padding: 24px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 14px; background: rgba(28, 28, 28, .94); box-shadow: 0 22px 55px rgba(0, 0, 0, .45); }
+        .role-picker h3 { margin: 0 0 6px; color: var(--gold); font-size: 19px; text-align: center; }
+        .role-picker p { margin: 0 0 18px; color: var(--muted); font-size: 12px; text-align: center; }
+        .role-options { display: grid; gap: 8px; }
+        .role-option { display: block; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 6px; background: rgba(255, 255, 255, .07); color: var(--text); font-size: 13px; text-align: center; text-decoration: none; transition: background .2s, border-color .2s; }
+        .role-option:hover { border-color: var(--gold); background: rgba(201, 164, 68, .18); }
+        .role-picker-close { position: absolute; top: 8px; right: 10px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 22px; }
+        .login-input.invalid { border-color: rgba(239, 170, 165, .95); box-shadow: 0 0 0 2px rgba(239, 170, 165, .18); }
+        .login-inline-message { display: none; margin: 12px 0 0; color: #efaaa5; font-size: 12px; text-align: center; }
+        .login-inline-message.visible { display: block; animation: pageEnter .25s ease both; }
+        .login-divider { display: flex; align-items: center; gap: 10px; margin: 15px 0 9px; color: rgba(255, 255, 255, .42); font-size: 10px; letter-spacing: .5px; text-transform: uppercase; }
+        .login-divider::before, .login-divider::after { content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, .18); }
+        .google-login { display: flex; justify-content: center; width: 100%; min-height: 34px; opacity: .82; filter: saturate(.82); }
         @media (max-width: 640px) {
             .login-panel { width: 100%; max-width: 430px; padding: 32px 24px; background: linear-gradient(90deg, rgba(18, 18, 18, .3) 0%, rgba(18, 18, 18, .58) 30%, rgba(18, 18, 18, .86) 70%, rgba(18, 18, 18, .94) 100%); }
             .brand { margin-bottom: 28px; }
@@ -141,44 +151,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div class="form-group">
                     <label for="correo">Correo electronico</label>
-                    <input type="email" id="correo" name="correo" placeholder="usuario@kion.com" autocomplete="email" required>
+                    <input class="login-input" type="email" id="correo" name="correo" placeholder="usuario@kion.com" autocomplete="email" required>
                 </div>
 
                 <div class="form-group">
                     <label for="contrasena">Contrasena</label>
-                    <input type="password" id="contrasena" name="contrasena" placeholder="Tu contrasena" autocomplete="current-password" required>
+                    <input class="login-input" type="password" id="contrasena" name="contrasena" placeholder="Tu contrasena" autocomplete="current-password" required>
                 </div>
 
                 <button class="btn-submit" type="submit">Iniciar Sesion</button>
             </form>
 
+            <small class="login-inline-message" id="loginInlineMessage" role="alert" aria-live="assertive"></small>
+
+            <div class="login-divider"><span>o continúa con</span></div>
+            <div class="google-login" id="googleLoginButton"></div>
+
             <div class="form-footer">
                 ¿No tienes cuenta? <a href="registro.php">Registrate</a>
+                <a class="role-demo-link" href="#seleccionar-rol" id="openRolePicker">Seleccionar rol</a>
             </div>
         </div>
     </aside>
 
-    <div class="login-message-overlay<?= $loginError !== '' ? ' visible' : '' ?>" id="loginMessageOverlay">
-        <div class="login-message" id="loginMessage" role="alert" aria-live="assertive">
-            <?php if ($loginError !== ''): ?>
-                <button class="login-message-close" type="button" aria-label="Cerrar notificación">&times;</button>
-                <strong class="login-message-title">No se pudo iniciar sesión</strong>
-                <ul class="login-message-list"><li><?= htmlspecialchars($loginError, ENT_QUOTES, 'UTF-8') ?></li></ul>
-            <?php endif; ?>
+    <div class="role-overlay" id="roleOverlay">
+        <div class="role-picker" role="dialog" aria-modal="true" aria-labelledby="rolePickerTitle">
+            <button class="role-picker-close" id="closeRolePicker" type="button" aria-label="Cerrar">&times;</button>
+            <h3 id="rolePickerTitle">Seleccionar rol</h3>
+            <p>Acceso rápido para la exposición de avances.</p>
+            <div class="role-options">
+                <a class="role-option" href="src/php/modulos/home/dashboard.php">Administrador General</a>
+                <a class="role-option" href="src/php/modulos/home/dashboard.php">Gerente</a>
+                <a class="role-option" href="src/php/modulos/home/dashboard.php">Cajero</a>
+                <a class="role-option" href="src/php/componentes/catalogo.php">Usuario</a>
+            </div>
         </div>
     </div>
 
     <script>
+        window.googleClientId = '467947233896-kuvnpl5cdegqkduq4m3e1ste6280feaf.apps.googleusercontent.com';
         const loginForm = document.getElementById('loginForm');
         const correoInput = document.getElementById('correo');
         const contrasenaInput = document.getElementById('contrasena');
-        const loginMessageOverlay = document.getElementById('loginMessageOverlay');
-        const loginMessage = document.getElementById('loginMessage');
+        const loginInlineMessage = document.getElementById('loginInlineMessage');
+        const roleOverlay = document.getElementById('roleOverlay');
+        const openRolePicker = document.getElementById('openRolePicker');
+        const closeRolePicker = document.getElementById('closeRolePicker');
 
-        function showLoginMessage(errors) {
-            loginMessage.innerHTML = `<button class="login-message-close" type="button" aria-label="Cerrar notificación">&times;</button><strong class="login-message-title">Revisa tu inicio de sesión</strong><ul class="login-message-list">${errors.map(error => `<li>${error}</li>`).join('')}</ul>`;
-            loginMessageOverlay.classList.add('visible');
+        openRolePicker.addEventListener('click', (evento) => {
+            evento.preventDefault();
+            roleOverlay.classList.add('visible');
+        });
+
+        closeRolePicker.addEventListener('click', () => roleOverlay.classList.remove('visible'));
+        roleOverlay.addEventListener('click', (evento) => {
+            if (evento.target === roleOverlay) roleOverlay.classList.remove('visible');
+        });
+
+        function showLoginMessage(errors, invalidFields = []) {
+            correoInput.classList.toggle('invalid', invalidFields.includes('correo'));
+            contrasenaInput.classList.toggle('invalid', invalidFields.includes('contrasena'));
+            loginInlineMessage.textContent = errors.join(' ');
+            loginInlineMessage.classList.add('visible');
         }
+
+        function handleGoogleCredential(response) {
+            const datos = new URLSearchParams({ credential: response.credential });
+            fetch('google-callback.php', { method: 'POST', body: datos })
+                .then(respuesta => respuesta.json())
+                .then(resultado => {
+                    if (resultado.ok) {
+                        window.location.href = resultado.redirect;
+                        return;
+                    }
+                    showLoginMessage([resultado.message || 'No fue posible iniciar sesión con Google.'], ['correo', 'contrasena']);
+                })
+                .catch(() => showLoginMessage(['No fue posible conectar con Google.'], ['correo', 'contrasena']));
+        }
+
+        window.onload = () => {
+            if (!window.google) return;
+            google.accounts.id.initialize({ client_id: window.googleClientId, callback: handleGoogleCredential });
+            google.accounts.id.renderButton(document.getElementById('googleLoginButton'), { theme: 'filled_black', size: 'medium', width: 240, text: 'signin_with', shape: 'rectangular', logo_alignment: 'center' });
+        };
 
         loginForm.addEventListener('submit', (evento) => {
             evento.preventDefault();
@@ -189,7 +244,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!contrasenaInput.value) errors.push('Escribe tu contraseña.');
 
             if (errors.length > 0) {
-                showLoginMessage(errors);
+                showLoginMessage(errors, [
+                    !correoInput.value.trim() || !correoInput.validity.valid ? 'correo' : '',
+                    !contrasenaInput.value ? 'contrasena' : ''
+                ]);
                 return;
             }
 
@@ -204,17 +262,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         window.location.href = resultado.redirect;
                         return;
                     }
-                    showLoginMessage([resultado.message || 'No fue posible iniciar sesión.']);
+                    showLoginMessage([resultado.message || 'No fue posible iniciar sesión.'], ['correo', 'contrasena']);
                 })
-                .catch(() => showLoginMessage(['No fue posible conectar con el servidor.']));
+                .catch(() => showLoginMessage(['No fue posible conectar con el servidor.'], ['correo', 'contrasena']));
         });
 
-        loginMessageOverlay.addEventListener('click', (evento) => {
-            if (evento.target === loginMessageOverlay || evento.target.closest('.login-message-close')) loginMessageOverlay.classList.remove('visible');
-        });
-
-        document.addEventListener('keydown', (evento) => {
-            if (evento.key === 'Escape') loginMessageOverlay.classList.remove('visible');
+        [correoInput, contrasenaInput].forEach((campo) => {
+            campo.addEventListener('input', () => {
+                campo.classList.remove('invalid');
+                if (!correoInput.classList.contains('invalid') && !contrasenaInput.classList.contains('invalid')) loginInlineMessage.classList.remove('visible');
+            });
         });
 
         document.querySelectorAll('a[href="registro.php"]').forEach((enlace) => {
@@ -225,4 +282,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             });
         });
     </script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </body>

@@ -106,6 +106,22 @@
             color: white !important;
         }
 
+        .btn-language {
+            border: 1px solid #bfa794;
+            padding: 9px 12px;
+            border-radius: 8px;
+            background: transparent;
+            color: #684735;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: .3s;
+        }
+
+        .btn-language:hover {
+            background: #f0e2d7;
+        }
+
 
         /* =====================================================
            HERO
@@ -1357,6 +1373,10 @@
             Iniciar sesión
         </a>
 
+        <button class="btn-language" id="languageToggle" type="button" aria-label="Cambiar idioma">
+            EN
+        </button>
+
     </nav>
 
 </header>
@@ -2418,6 +2438,151 @@
 
 
 </footer>
+
+<script>
+    const translations = {
+        'Inicio': 'Home',
+        'Funciones': 'Features',
+        'Ventas': 'Sales',
+        'Inventario': 'Inventory',
+        'Sucursales': 'Branches',
+        'Nosotros': 'About us',
+        'Iniciar sesión': 'Sign in',
+        'SOFTWARE PARA VETERINARIAS': 'SOFTWARE FOR VETERINARY CLINICS',
+        'La administración': 'Managing',
+        'de tu veterinaria,': 'your veterinary clinic,',
+        'más fácil.': 'made easier.',
+        'Comenzar ahora': 'Get started',
+        'Conocer KION': 'Discover KION',
+        'Panel de KION': 'KION dashboard',
+        'Ventas recientes': 'Recent sales',
+        'Inventario': 'Inventory',
+        'Una solución pensada para': 'A solution designed for',
+        'veterinarias que quieren tener el control de su negocio.': 'veterinary clinics that want control of their business.',
+        'TODO EN UN SOLO LUGAR': 'EVERYTHING IN ONE PLACE',
+        'Todo lo que tu veterinaria necesita': 'Everything your veterinary clinic needs',
+        'Punto de venta': 'Point of sale',
+        'Usuarios': 'Users',
+        'PENSADO PARA VETERINARIAS': 'DESIGNED FOR VETERINARY CLINICS',
+        'Tu veterinaria necesita más que una caja.': 'Your veterinary clinic needs more than a register.',
+        'VENTAS': 'SALES',
+        'Vende de forma rápida y organizada.': 'Sell quickly and stay organized.',
+        'INVENTARIO': 'INVENTORY',
+        'Mantén tus productos bajo control.': 'Keep your products under control.',
+        'MULTI-SUCURSAL': 'MULTI-BRANCH',
+        'Una sola plataforma para todas tus sucursales': 'One platform for all your branches',
+        'SIMPLE Y ORGANIZADO': 'SIMPLE AND ORGANIZED',
+        'Comienza a utilizar KION': 'Start using KION',
+        '¿POR QUÉ KION?': 'WHY KION?',
+        'Menos complicaciones. Más control.': 'Less hassle. More control.',
+        'Tu veterinaria necesita control.': 'Your veterinary clinic needs control.',
+        'Ventas, inventario y sucursales en un solo lugar.': 'Sales, inventory, and branches in one place.',
+        'Comenzar con KION': 'Get started with KION',
+        'KION es un sistema de punto de venta e inventario diseñado para ayudarte a controlar las ventas, productos, usuarios y sucursales de tu negocio veterinario desde un solo lugar.': 'KION is a point-of-sale and inventory system designed to help you manage sales, products, users, and branches from one place.',
+        'KION reúne las herramientas necesarias para administrar las operaciones de tu negocio de manera sencilla y organizada.': 'KION brings together the tools you need to manage your business simply and efficiently.',
+        'Punto de venta': 'Point of sale',
+        'Registra las ventas de alimentos, medicamentos, accesorios y productos veterinarios de manera rápida.': 'Record food, medicine, accessories, and veterinary product sales quickly.',
+        'Mantén controladas las existencias de los productos de tu veterinaria.': 'Keep track of your veterinary clinic inventory.',
+        'Administra diferentes sucursales desde un mismo sistema.': 'Manage different branches from one system.',
+        'Gestiona los accesos y funciones de gerentes y cajeros.': 'Manage manager and cashier access and permissions.',
+        'Administrar una veterinaria implica mucho más que realizar ventas. También necesitas controlar productos, existencias, sucursales y usuarios.': 'Managing a veterinary clinic involves more than making sales. You also need to control products, inventory, branches, and users.',
+        'Control de productos veterinarios': 'Veterinary product control',
+        'Registro de ventas': 'Sales recording',
+        'Inventario actualizado': 'Updated inventory',
+        'Administración de sucursales': 'Branch management',
+        'Usuarios con diferentes funciones': 'Users with different permissions',
+        'Productos veterinarios': 'Veterinary products',
+        'Nueva venta': 'New sale',
+        'Alimento para perro': 'Dog food',
+        'Medicamento': 'Medicine',
+        'Accesorio': 'Accessory',
+        'Total': 'Total',
+        'Registra cada operación desde el punto de venta y mantén la información de tu negocio organizada.': 'Record every transaction at the point of sale and keep your business information organized.',
+        'Productos veterinarios': 'Veterinary products',
+        'Control por sucursal': 'Branch-based control',
+        'Actualización del inventario': 'Inventory updates',
+        'Mantén tus productos bajo control.': 'Keep your products under control.',
+        'Con KION puedes consultar las existencias de los productos de tu veterinaria y mantener organizada la información de cada sucursal.': 'With KION, you can check product stock and keep each branch organized.',
+        'Consulta de existencias': 'Check inventory',
+        'Organización por productos': 'Organized by product',
+        'Actualización después de una venta': 'Updated after every sale',
+        'Inventario de productos': 'Product inventory',
+        'Producto': 'Product',
+        'Existencia': 'Stock',
+        'Estado': 'Status',
+        'Disponible': 'Available',
+        'Bajo': 'Low',
+        'Centraliza la información y facilita la administración de cada punto de venta de tu negocio veterinario.': 'Centralize information and simplify the management of every veterinary branch.',
+        'Sucursal': 'Branch',
+        'Administra los productos y operaciones correspondientes a cada sucursal.': 'Manage the products and operations for each branch.',
+        'Gerentes': 'Managers',
+        'Los responsables de cada sede pueden gestionar las operaciones de su sucursal.': 'Branch managers can manage their location operations.',
+        'Cajeros': 'Cashiers',
+        'Realizan las ventas y consultan la información necesaria para trabajar.': 'They make sales and access the information they need to work.',
+        'Organiza las operaciones de tu veterinaria desde un solo sistema.': 'Organize your veterinary clinic operations from one system.',
+        'Registra': 'Register',
+        'Agrega tus productos, sucursales y usuarios al sistema.': 'Add your products, branches, and users to the system.',
+        'Administra': 'Manage',
+        'Controla inventario, usuarios y operaciones de cada sucursal.': 'Control inventory, users, and every branch operation.',
+        'Vende': 'Sell',
+        'Registra las ventas y mantén actualizado tu inventario.': 'Record sales and keep your inventory updated.',
+        'Especializado': 'Specialized',
+        'Diseñado pensando en las necesidades de negocios veterinarios.': 'Designed for the needs of veterinary businesses.',
+        'Sencillo': 'Simple',
+        'Una interfaz pensada para facilitar las operaciones diarias.': 'An interface designed to simplify daily operations.',
+        'Organizado': 'Organized',
+        'Mantén tus productos e información organizada.': 'Keep your products and information organized.',
+        'Centralizado': 'Centralized',
+        'Gestiona las diferentes sucursales desde un mismo sistema.': 'Manage different branches from one system.',
+        '✓ Control de productos veterinarios': '✓ Veterinary product control',
+        '✓ Registro de ventas': '✓ Sales recording',
+        '✓ Inventario actualizado': '✓ Updated inventory',
+        '✓ Administración de sucursales': '✓ Branch management',
+        '✓ Usuarios con diferentes funciones': '✓ Users with different permissions',
+        '✓ Productos veterinarios': '✓ Veterinary products',
+        '✓ Control por sucursal': '✓ Branch-based control',
+        '✓ Actualización del inventario': '✓ Inventory updates',
+        '✓ Consulta de existencias': '✓ Check inventory',
+        '✓ Organización por productos': '✓ Organized by product',
+        '✓ Actualización después de una venta': '✓ Updated after every sale',
+        '🐾 SOFTWARE PARA VETERINARIAS': '🐾 SOFTWARE FOR VETERINARY CLINICS',
+        '🐾 Especializado': '🐾 Specialized',
+        '⚡ Sencillo': '⚡ Simple',
+        '📦 Organizado': '📦 Organized',
+        '🏪 Centralizado': '🏪 Centralized',
+        'Alimentos': 'Food',
+        'Medicamentos': 'Medicine',
+        'Accesorios': 'Accessories',
+        'Productos agropecuarios': 'Agricultural products',
+        'PUNTO DE VENTA': 'POINT OF SALE',
+        '© 2026 KION · Punto de Venta e Inventario para Veterinarias': '© 2026 KION · Point of Sale and Inventory for Veterinary Clinics'
+    };
+
+    const originalTexts = new Map();
+    let englishActive = false;
+
+    function translateHome() {
+        document.querySelectorAll('body *:not(script):not(style)').forEach((element) => {
+            element.childNodes.forEach((node) => {
+                if (node.nodeType !== Node.TEXT_NODE) return;
+                    if (!originalTexts.has(node)) originalTexts.set(node, node.textContent);
+                    const originalText = originalTexts.get(node);
+                    const original = originalText.trim().replace(/\s+/g, ' ');
+                if (!original || !translations[original]) return;
+                    const padding = originalText.match(/^\s*/)[0];
+                    const suffix = originalText.match(/\s*$/)[0];
+                    node.textContent = englishActive ? `${padding}${translations[original]}${suffix}` : originalText;
+            });
+        });
+        document.documentElement.lang = englishActive ? 'en' : 'es';
+        document.getElementById('languageToggle').textContent = englishActive ? 'ES' : 'EN';
+    }
+
+    document.getElementById('languageToggle').addEventListener('click', () => {
+        englishActive = !englishActive;
+        translateHome();
+    });
+</script>
 
 
 </body>

@@ -156,6 +156,7 @@ CREATE TABLE `usuarios` (
   `nombre` varchar(100) NOT NULL,
   `apellido` varchar(100) NOT NULL,
   `correo` varchar(150) NOT NULL,
+  `google_id` varchar(255) DEFAULT NULL,
   `password_hash` varchar(255) NOT NULL,
   `id_rol` int(10) UNSIGNED NOT NULL,
   `id_sucursal` int(10) UNSIGNED DEFAULT NULL,
@@ -239,6 +240,7 @@ ALTER TABLE `sucursales`
 --
 ALTER TABLE `usuarios`
   ADD PRIMARY KEY (`id_usuario`),
+  ADD UNIQUE KEY `google_id` (`google_id`),
   ADD UNIQUE KEY `correo` (`correo`),
   ADD KEY `id_rol` (`id_rol`),
   ADD KEY `id_sucursal` (`id_sucursal`);
