@@ -188,6 +188,10 @@
         .hero h1 span {
             color: #a76d48;
         }
+        }
+        .hero h1 span.hero-heading-part {
+            color: #38271e;
+        }
 
 
         .hero p {
@@ -1404,9 +1408,9 @@
             <span>más fácil.</span>
 
         </h1>
-
-
-        <p>
+              <span class="hero-heading-part" data-i18n="La administración">La administración</span>
+              <span class="hero-heading-part" data-i18n="de tu veterinaria,">de tu veterinaria,</span>
+              <span data-i18n="más fácil.">más fácil.</span>
 
             KION es un sistema de punto de venta e inventario
             diseñado para ayudarte a controlar las ventas,
@@ -1539,7 +1543,7 @@
                     <div class="inventory-item">
 
                         <span>
-                            Alimentos
+                               <span data-i18n="Alimentos">Alimentos</span>
                         </span>
 
                         <span class="available">
@@ -1801,7 +1805,7 @@
             <div class="vet-row">
 
                 <span>
-                    Alimentos
+                       <span data-i18n="Alimentos">Alimentos</span>
                 </span>
 
                 <strong>
@@ -1816,7 +1820,7 @@
                 <span>
                     Medicamentos
                 </span>
-
+                    <span data-i18n="Alimentos">Alimentos</span>
                 <strong>
                     48
                 </strong>
@@ -2562,9 +2566,16 @@
     let englishActive = false;
 
     function translateHome() {
+        document.querySelectorAll('[data-i18n]').forEach((element) => {
+            const key = element.dataset.i18n;
+            if (!element.dataset.originalText) element.dataset.originalText = element.textContent;
+            element.textContent = englishActive ? translations[key] : element.dataset.originalText;
+        });
+
         document.querySelectorAll('body *:not(script):not(style)').forEach((element) => {
             element.childNodes.forEach((node) => {
                 if (node.nodeType !== Node.TEXT_NODE) return;
+                if (node.parentElement?.hasAttribute('data-i18n')) return;
                     if (!originalTexts.has(node)) originalTexts.set(node, node.textContent);
                     const originalText = originalTexts.get(node);
                     const original = originalText.trim().replace(/\s+/g, ' ');
