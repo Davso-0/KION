@@ -106,20 +106,43 @@
             color: white !important;
         }
 
-        .btn-language {
-            border: 1px solid #bfa794;
-            padding: 9px 12px;
-            border-radius: 8px;
-            background: transparent;
-            color: #684735;
+
+        /* =====================================================
+           BOTÓN MODO OSCURO
+        ===================================================== */
+
+        .dark-mode-btn {
+            border: 1px solid #8d6045;
+
+            background: #fffaf6;
+
+            color: #563827;
+
+            width: 42px;
+            height: 42px;
+
+            border-radius: 50%;
+
             cursor: pointer;
-            font-size: 12px;
-            font-weight: bold;
+
+            font-size: 18px;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
             transition: .3s;
         }
 
-        .btn-language:hover {
-            background: #f0e2d7;
+
+        .dark-mode-btn:hover {
+            background: #8d6045;
+
+            color: white;
+
+            transform: scale(1.08);
         }
 
 
@@ -1228,6 +1251,409 @@
 
 
         /* =====================================================
+           MODO OSCURO
+        ===================================================== */
+
+        body.dark-mode {
+            background: #171311;
+            color: #eeeeee;
+        }
+
+
+        /* NAVBAR */
+
+        body.dark-mode .navbar {
+            background: #211b18;
+            border-bottom: 1px solid #3b302a;
+        }
+
+
+        body.dark-mode .logo {
+            color: #e4c6b0;
+        }
+
+
+        body.dark-mode .logo span {
+            color: #c18b67;
+        }
+
+
+        body.dark-mode .menu a {
+            color: #ded7d2;
+        }
+
+
+        body.dark-mode .menu a:hover {
+            color: #d09a75;
+        }
+
+
+        body.dark-mode .btn-login {
+            border-color: #a87959;
+        }
+
+
+        body.dark-mode .dark-mode-btn {
+            background: #30251f;
+            color: #f3d4bc;
+            border-color: #a87959;
+        }
+
+
+        /* HERO */
+
+        body.dark-mode .hero {
+            background:
+                radial-gradient(
+                    circle at 85% 20%,
+                    #493428,
+                    transparent 30%
+                ),
+                #171311;
+        }
+
+
+        body.dark-mode .tag {
+            background: #3b2b23;
+            color: #d9a984;
+        }
+
+
+        body.dark-mode .hero h1 {
+            color: #f1e9e4;
+        }
+
+
+        body.dark-mode .hero h1 span {
+            color: #d19a74;
+        }
+
+
+        body.dark-mode .hero p {
+            color: #c0b7b1;
+        }
+
+
+        body.dark-mode .btn-secondary {
+            color: #e1b99b;
+            border-color: #80604c;
+        }
+
+
+        body.dark-mode .btn-secondary:hover {
+            background: #3a2b23;
+        }
+
+
+        /* DASHBOARD */
+
+        body.dark-mode .dashboard {
+            background: #24201e;
+            border-color: #403731;
+
+            box-shadow:
+                0 30px 70px rgba(0, 0, 0, .45);
+        }
+
+
+        body.dark-mode .dashboard-title {
+            color: #eee4dd;
+        }
+
+
+        body.dark-mode .stat {
+            background: #302925;
+        }
+
+
+        body.dark-mode .stat small {
+            color: #aaa09a;
+        }
+
+
+        body.dark-mode .stat strong {
+            color: #eee4dd;
+        }
+
+
+        body.dark-mode .chart,
+        body.dark-mode .inventory {
+            background: #2b2522;
+        }
+
+
+        body.dark-mode .chart h4,
+        body.dark-mode .inventory h4 {
+            color: #e7ddd6;
+        }
+
+
+        body.dark-mode .inventory-item {
+            border-color: #403832;
+        }
+
+
+        /* INTRO */
+
+        body.dark-mode .intro {
+            background: #171311;
+            color: #aaa19b;
+        }
+
+
+        body.dark-mode .intro strong {
+            color: #d2aa8e;
+        }
+
+
+        /* FUNCIONES */
+
+        body.dark-mode .features-section {
+            background: #201b18;
+        }
+
+
+        body.dark-mode .section-title {
+            color: #eee7e2;
+        }
+
+
+        body.dark-mode .section-description {
+            color: #b9b0aa;
+        }
+
+
+        body.dark-mode .feature-card {
+            background: #292421;
+            border-color: #403731;
+        }
+
+
+        body.dark-mode .feature-card h3 {
+            color: #e9dfd8;
+        }
+
+
+        body.dark-mode .feature-card p {
+            color: #b4aaa4;
+        }
+
+
+        body.dark-mode .feature-icon {
+            background: #3b2c24;
+        }
+
+
+        /* VETERINARIA */
+
+        body.dark-mode .vet-section {
+            background: #1b1715;
+        }
+
+
+        body.dark-mode .vet-text h2 {
+            color: #eee6e1;
+        }
+
+
+        body.dark-mode .vet-text p {
+            color: #b9b0aa;
+        }
+
+
+        body.dark-mode .check-list li {
+            color: #d0c6c0;
+        }
+
+
+        body.dark-mode .vet-card {
+            background: #292421;
+        }
+
+
+        body.dark-mode .vet-card h3 {
+            color: #eee4dd;
+        }
+
+
+        body.dark-mode .vet-row {
+            border-color: #413832;
+            color: #d6cec8;
+        }
+
+
+        body.dark-mode .vet-icon {
+            background: #49352a;
+        }
+
+
+        /* VENTAS */
+
+        body.dark-mode .sales-section {
+            background: #171311;
+        }
+
+
+        body.dark-mode .sale-screen {
+            background: #292421;
+        }
+
+
+        body.dark-mode .sale-screen h3 {
+            color: #eee4dd;
+        }
+
+
+        body.dark-mode .sale-item {
+            border-color: #413832;
+            color: #d6cec8;
+        }
+
+
+        body.dark-mode .sale-total {
+            color: #d6a27d;
+        }
+
+
+        body.dark-mode .sales-text h2 {
+            color: #eee6e1;
+        }
+
+
+        body.dark-mode .sales-text p {
+            color: #b9b0aa;
+        }
+
+
+        /* INVENTARIO */
+
+        body.dark-mode .inventory-section {
+            background: #1b1715;
+        }
+
+
+        body.dark-mode .inventory-text h2 {
+            color: #eee6e1;
+        }
+
+
+        body.dark-mode .inventory-text p {
+            color: #b9b0aa;
+        }
+
+
+        body.dark-mode .inventory-visual {
+            background: #292421;
+
+            box-shadow:
+                0 15px 40px rgba(0,0,0,.35);
+        }
+
+
+        body.dark-mode .table-header {
+            color: #d5a27e;
+        }
+
+
+        body.dark-mode .table-header,
+        body.dark-mode .table-row {
+            border-color: #413832;
+        }
+
+
+        body.dark-mode .table-row {
+            color: #d5cec8;
+        }
+
+
+        /* SUCURSALES */
+
+        body.dark-mode .branches {
+            background: #201b18;
+        }
+
+
+        body.dark-mode .branch {
+            background: #292421;
+            border-color: #403731;
+        }
+
+
+        body.dark-mode .branch h3 {
+            color: #eee4dd;
+        }
+
+
+        body.dark-mode .branch p {
+            color: #b8aea8;
+        }
+
+
+        /* PASOS */
+
+        body.dark-mode .steps {
+            background: #171311;
+        }
+
+
+        body.dark-mode .step {
+            background: #292421;
+            border-color: #403731;
+        }
+
+
+        body.dark-mode .step h3 {
+            color: #eee4dd;
+        }
+
+
+        body.dark-mode .step p {
+            color: #b8aea8;
+        }
+
+
+        /* BENEFICIOS */
+
+        body.dark-mode .benefits {
+            background: #302620;
+        }
+
+
+        body.dark-mode .benefit strong {
+            color: #eadbd1;
+        }
+
+
+        body.dark-mode .benefit p {
+            color: #bdb2ab;
+        }
+
+
+        /* CTA */
+
+        body.dark-mode .cta {
+            background:
+                linear-gradient(
+                    135deg,
+                    #211813,
+                    #493024
+                );
+        }
+
+
+        /* FOOTER */
+
+        body.dark-mode footer {
+            background: #0e0b0a;
+        }
+
+
+        body.dark-mode footer p {
+            color: #aaa09a;
+        }
+
+
+        /* =====================================================
            RESPONSIVE
         ===================================================== */
 
@@ -1373,8 +1799,11 @@
             Iniciar sesión
         </a>
 
-        <button class="btn-language" id="languageToggle" type="button" aria-label="Cambiar idioma">
-            EN
+        <!-- BOTÓN MODO OSCURO -->
+        <button id="darkModeBtn" class="dark-mode-btn" title="Cambiar modo">
+
+            🌙
+
         </button>
 
     </nav>
@@ -2439,149 +2868,34 @@
 
 </footer>
 
+
+
+<!-- =====================================================
+     JAVASCRIPT MODO OSCURO
+===================================================== -->
+
 <script>
-    const translations = {
-        'Inicio': 'Home',
-        'Funciones': 'Features',
-        'Ventas': 'Sales',
-        'Inventario': 'Inventory',
-        'Sucursales': 'Branches',
-        'Nosotros': 'About us',
-        'Iniciar sesión': 'Sign in',
-        'SOFTWARE PARA VETERINARIAS': 'SOFTWARE FOR VETERINARY CLINICS',
-        'La administración': 'Managing',
-        'de tu veterinaria,': 'your veterinary clinic,',
-        'más fácil.': 'made easier.',
-        'Comenzar ahora': 'Get started',
-        'Conocer KION': 'Discover KION',
-        'Panel de KION': 'KION dashboard',
-        'Ventas recientes': 'Recent sales',
-        'Inventario': 'Inventory',
-        'Una solución pensada para': 'A solution designed for',
-        'veterinarias que quieren tener el control de su negocio.': 'veterinary clinics that want control of their business.',
-        'TODO EN UN SOLO LUGAR': 'EVERYTHING IN ONE PLACE',
-        'Todo lo que tu veterinaria necesita': 'Everything your veterinary clinic needs',
-        'Punto de venta': 'Point of sale',
-        'Usuarios': 'Users',
-        'PENSADO PARA VETERINARIAS': 'DESIGNED FOR VETERINARY CLINICS',
-        'Tu veterinaria necesita más que una caja.': 'Your veterinary clinic needs more than a register.',
-        'VENTAS': 'SALES',
-        'Vende de forma rápida y organizada.': 'Sell quickly and stay organized.',
-        'INVENTARIO': 'INVENTORY',
-        'Mantén tus productos bajo control.': 'Keep your products under control.',
-        'MULTI-SUCURSAL': 'MULTI-BRANCH',
-        'Una sola plataforma para todas tus sucursales': 'One platform for all your branches',
-        'SIMPLE Y ORGANIZADO': 'SIMPLE AND ORGANIZED',
-        'Comienza a utilizar KION': 'Start using KION',
-        '¿POR QUÉ KION?': 'WHY KION?',
-        'Menos complicaciones. Más control.': 'Less hassle. More control.',
-        'Tu veterinaria necesita control.': 'Your veterinary clinic needs control.',
-        'Ventas, inventario y sucursales en un solo lugar.': 'Sales, inventory, and branches in one place.',
-        'Comenzar con KION': 'Get started with KION',
-        'KION es un sistema de punto de venta e inventario diseñado para ayudarte a controlar las ventas, productos, usuarios y sucursales de tu negocio veterinario desde un solo lugar.': 'KION is a point-of-sale and inventory system designed to help you manage sales, products, users, and branches from one place.',
-        'KION reúne las herramientas necesarias para administrar las operaciones de tu negocio de manera sencilla y organizada.': 'KION brings together the tools you need to manage your business simply and efficiently.',
-        'Punto de venta': 'Point of sale',
-        'Registra las ventas de alimentos, medicamentos, accesorios y productos veterinarios de manera rápida.': 'Record food, medicine, accessories, and veterinary product sales quickly.',
-        'Mantén controladas las existencias de los productos de tu veterinaria.': 'Keep track of your veterinary clinic inventory.',
-        'Administra diferentes sucursales desde un mismo sistema.': 'Manage different branches from one system.',
-        'Gestiona los accesos y funciones de gerentes y cajeros.': 'Manage manager and cashier access and permissions.',
-        'Administrar una veterinaria implica mucho más que realizar ventas. También necesitas controlar productos, existencias, sucursales y usuarios.': 'Managing a veterinary clinic involves more than making sales. You also need to control products, inventory, branches, and users.',
-        'Control de productos veterinarios': 'Veterinary product control',
-        'Registro de ventas': 'Sales recording',
-        'Inventario actualizado': 'Updated inventory',
-        'Administración de sucursales': 'Branch management',
-        'Usuarios con diferentes funciones': 'Users with different permissions',
-        'Productos veterinarios': 'Veterinary products',
-        'Nueva venta': 'New sale',
-        'Alimento para perro': 'Dog food',
-        'Medicamento': 'Medicine',
-        'Accesorio': 'Accessory',
-        'Total': 'Total',
-        'Registra cada operación desde el punto de venta y mantén la información de tu negocio organizada.': 'Record every transaction at the point of sale and keep your business information organized.',
-        'Productos veterinarios': 'Veterinary products',
-        'Control por sucursal': 'Branch-based control',
-        'Actualización del inventario': 'Inventory updates',
-        'Mantén tus productos bajo control.': 'Keep your products under control.',
-        'Con KION puedes consultar las existencias de los productos de tu veterinaria y mantener organizada la información de cada sucursal.': 'With KION, you can check product stock and keep each branch organized.',
-        'Consulta de existencias': 'Check inventory',
-        'Organización por productos': 'Organized by product',
-        'Actualización después de una venta': 'Updated after every sale',
-        'Inventario de productos': 'Product inventory',
-        'Producto': 'Product',
-        'Existencia': 'Stock',
-        'Estado': 'Status',
-        'Disponible': 'Available',
-        'Bajo': 'Low',
-        'Centraliza la información y facilita la administración de cada punto de venta de tu negocio veterinario.': 'Centralize information and simplify the management of every veterinary branch.',
-        'Sucursal': 'Branch',
-        'Administra los productos y operaciones correspondientes a cada sucursal.': 'Manage the products and operations for each branch.',
-        'Gerentes': 'Managers',
-        'Los responsables de cada sede pueden gestionar las operaciones de su sucursal.': 'Branch managers can manage their location operations.',
-        'Cajeros': 'Cashiers',
-        'Realizan las ventas y consultan la información necesaria para trabajar.': 'They make sales and access the information they need to work.',
-        'Organiza las operaciones de tu veterinaria desde un solo sistema.': 'Organize your veterinary clinic operations from one system.',
-        'Registra': 'Register',
-        'Agrega tus productos, sucursales y usuarios al sistema.': 'Add your products, branches, and users to the system.',
-        'Administra': 'Manage',
-        'Controla inventario, usuarios y operaciones de cada sucursal.': 'Control inventory, users, and every branch operation.',
-        'Vende': 'Sell',
-        'Registra las ventas y mantén actualizado tu inventario.': 'Record sales and keep your inventory updated.',
-        'Especializado': 'Specialized',
-        'Diseñado pensando en las necesidades de negocios veterinarios.': 'Designed for the needs of veterinary businesses.',
-        'Sencillo': 'Simple',
-        'Una interfaz pensada para facilitar las operaciones diarias.': 'An interface designed to simplify daily operations.',
-        'Organizado': 'Organized',
-        'Mantén tus productos e información organizada.': 'Keep your products and information organized.',
-        'Centralizado': 'Centralized',
-        'Gestiona las diferentes sucursales desde un mismo sistema.': 'Manage different branches from one system.',
-        '✓ Control de productos veterinarios': '✓ Veterinary product control',
-        '✓ Registro de ventas': '✓ Sales recording',
-        '✓ Inventario actualizado': '✓ Updated inventory',
-        '✓ Administración de sucursales': '✓ Branch management',
-        '✓ Usuarios con diferentes funciones': '✓ Users with different permissions',
-        '✓ Productos veterinarios': '✓ Veterinary products',
-        '✓ Control por sucursal': '✓ Branch-based control',
-        '✓ Actualización del inventario': '✓ Inventory updates',
-        '✓ Consulta de existencias': '✓ Check inventory',
-        '✓ Organización por productos': '✓ Organized by product',
-        '✓ Actualización después de una venta': '✓ Updated after every sale',
-        '🐾 SOFTWARE PARA VETERINARIAS': '🐾 SOFTWARE FOR VETERINARY CLINICS',
-        '🐾 Especializado': '🐾 Specialized',
-        '⚡ Sencillo': '⚡ Simple',
-        '📦 Organizado': '📦 Organized',
-        '🏪 Centralizado': '🏪 Centralized',
-        'Alimentos': 'Food',
-        'Medicamentos': 'Medicine',
-        'Accesorios': 'Accessories',
-        'Productos agropecuarios': 'Agricultural products',
-        'PUNTO DE VENTA': 'POINT OF SALE',
-        '© 2026 KION · Punto de Venta e Inventario para Veterinarias': '© 2026 KION · Point of Sale and Inventory for Veterinary Clinics'
-    };
 
-    const originalTexts = new Map();
-    let englishActive = false;
+    const darkModeBtn = document.getElementById("darkModeBtn");
 
-    function translateHome() {
-        document.querySelectorAll('body *:not(script):not(style)').forEach((element) => {
-            element.childNodes.forEach((node) => {
-                if (node.nodeType !== Node.TEXT_NODE) return;
-                    if (!originalTexts.has(node)) originalTexts.set(node, node.textContent);
-                    const originalText = originalTexts.get(node);
-                    const original = originalText.trim().replace(/\s+/g, ' ');
-                if (!original || !translations[original]) return;
-                    const padding = originalText.match(/^\s*/)[0];
-                    const suffix = originalText.match(/\s*$/)[0];
-                    node.textContent = englishActive ? `${padding}${translations[original]}${suffix}` : originalText;
-            });
-        });
-        document.documentElement.lang = englishActive ? 'en' : 'es';
-        document.getElementById('languageToggle').textContent = englishActive ? 'ES' : 'EN';
-    }
 
-    document.getElementById('languageToggle').addEventListener('click', () => {
-        englishActive = !englishActive;
-        translateHome();
+    darkModeBtn.addEventListener("click", function () {
+
+        document.body.classList.toggle("dark-mode");
+
+
+        if (document.body.classList.contains("dark-mode")) {
+
+            darkModeBtn.innerHTML = "☀️";
+
+        } else {
+
+            darkModeBtn.innerHTML = "🌙";
+
+        }
+
     });
+
 </script>
 
 
