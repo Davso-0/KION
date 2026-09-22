@@ -1,4 +1,17 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
+
+if (isset($_SESSION['usuario'])) {
+    header('Location: src/php/modulos/home/home.php');
+    exit;
+}
+
 $registroMensaje = '';
 $registroExitoso = false;
 
@@ -31,10 +44,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $consulta = $pdo->prepare('INSERT INTO usuarios (nombre, apellido, correo, password_hash, id_rol, estado) VALUES (?, ?, ?, ?, ?, \'ACTIVO\')');
             $consulta->execute([$nombre, $apellido, $correo, password_hash($contrasena, PASSWORD_DEFAULT), $rol]);
-            $registroMensaje = 'Registro completado correctamente.';
-            $registroExitoso = true;
+            $newUserId = (int)$pdo->lastInsertId();
+
+            session_regenerate_id(true);
+            $_SESSION['usuario'] = [
+                'id_usuario'  => $newUserId,
+                'nombre'      => $nombre,
+                'apellido'    => $apellido,
+                'correo'      => $correo,
+                'id_rol'      => (int)$rol,
+                'id_sucursal' => null,
+                'rol'         => 'Usuario'
+            ];
+
+            header('Location: src/php/modulos/home/home.php');
+            exit;
         } catch (PDOException $e) {
-            $registroMensaje = $e->errorInfo[1] === 1062 ? 'Ese correo ya está registrado.' : 'No fue posible completar el registro.';
+            $registroMensaje = ($e->errorInfo[1] ?? 0) === 1062 ? 'Ese correo ya está registrado.' : 'No fue posible completar el registro.';
         } catch (Throwable $e) {
             $registroMensaje = $e->getMessage();
         }

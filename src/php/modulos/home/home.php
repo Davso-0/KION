@@ -1,3 +1,14 @@
+<?php
+declare(strict_types=1);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1770,53 +1781,142 @@
             }
         }
 
+
+        /* =====================================================
+           ANIMACIONES E ICONOS VECTORIALES CSS
+        ===================================================== */
+        .kion-icon {
+            display: inline-block;
+            vertical-align: middle;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.3s ease, fill 0.3s ease;
+        }
+
+        .kion-icon-float {
+            animation: kionFloat 3.5s ease-in-out infinite;
+        }
+
+        .kion-icon-pulse {
+            animation: kionPulse 2.8s ease-in-out infinite;
+        }
+
+        .kion-icon-spin-hover:hover {
+            transform: rotate(20deg) scale(1.15);
+        }
+
+        @keyframes kionFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        @keyframes kionPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.08); opacity: 0.85; }
+        }
+
+        .feature-card .feature-icon, .branch .branch-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #f4e8de, #ead5c3);
+            color: #85583e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 18px;
+            box-shadow: 0 4px 12px rgba(133, 88, 62, 0.12);
+            transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .feature-card:hover .feature-icon, .branch:hover .branch-icon {
+            background: linear-gradient(135deg, #85583e, #563827);
+            color: #ffffff;
+            transform: translateY(-4px) scale(1.08);
+            box-shadow: 0 8px 22px rgba(86, 56, 39, 0.25);
+        }
+
+        .feature-card:hover .feature-icon svg, .branch:hover .branch-icon svg {
+            stroke: #ffffff;
+            transform: scale(1.1);
+        }
+
+        .check-list li {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+            font-size: 15px;
+            color: #59473b;
+            transition: transform 0.22s ease, color 0.22s ease;
+        }
+
+        .check-list li:hover {
+            transform: translateX(4px);
+            color: #85583e;
+        }
+
+        .check-icon-badge {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #e4ebd9;
+            color: #4a753c;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 2px 6px rgba(74, 117, 60, 0.15);
+            transition: background 0.25s ease, color 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .check-list li:hover .check-icon-badge {
+            background: #4a753c;
+            color: #ffffff;
+            transform: scale(1.15) rotate(5deg);
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dark-mode-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 14px;
+            border-radius: 20px;
+        }
+
     </style>
 </head>
 
-
 <body>
-
 
 <!-- =====================================================
      NAVBAR
 ===================================================== -->
-
 <header class="navbar">
-
     <div class="logo">
         KI<span>O</span>N
     </div>
 
-
     <nav class="menu">
+        <a href="#inicio">Inicio</a>
+        <a href="../../componentes/catalogo.php">Catálogo</a>
 
-        <a href="#inicio">
-            Inicio
-        </a>
-
-        <a href="#funciones">
-            Funciones
-        </a>
-
-        <a href="#ventas">
-            Ventas
-        </a>
-
-        <a href="#inventario">
-            Inventario
-        </a>
-
-        <a href="#sucursales">
-            Sucursales
-        </a>
-
-        <a href="#nosotros">
-            Nosotros
-        </a>
-
-        <a href="../../../../inicioSesion.php" class="btn-login">
-            Iniciar sesión
-        </a>
+        <?php if (isset($_SESSION['usuario'])): ?>
+            <a href="dashboard.php" class="btn-login" style="background: #8d6045; color: #ffffff !important; display: inline-flex; align-items: center; gap: 8px;">
+                <svg class="kion-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                 <?= htmlspecialchars($_SESSION['usuario']['nombre'], ENT_QUOTES, 'UTF-8') ?>
+            </a>
+            <a href="cerrarSesion.php" style="color: #c94a4a; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;">
+                <svg class="kion-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                Cerrar sesión
+            </a>
+        <?php else: ?>
+            <a href="../../../../inicioSesion.php" class="btn-login">Iniciar sesión</a>
+        <?php endif; ?>
 
         <!-- BOTÓN MODO OSCURO -->
         <button id="darkModeBtn" class="dark-mode-btn" title="Cambiar modo">
@@ -1828,1151 +1928,310 @@
         <button id="languageToggle" class="language-btn" type="button" aria-label="Cambiar idioma">
             EN
         </button>
-
     </nav>
-
 </header>
-
-
 
 <!-- =====================================================
      HERO
 ===================================================== -->
-
 <section class="hero" id="inicio">
-
-
     <div class="hero-content">
-
         <div class="tag">
-            🐾 SOFTWARE PARA VETERINARIAS
+            <svg class="kion-icon kion-icon-pulse" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+            <span>SOFTWARE PARA VETERINARIAS</span>
         </div>
-
 
         <h1>
-
-            La administración
-            de tu veterinaria,
+            La administración de tu veterinaria,
             <span>más fácil.</span>
-
         </h1>
 
-
         <p>
-
-            KION es un sistema de punto de venta e inventario
-            diseñado para ayudarte a controlar las ventas,
-            productos, usuarios y sucursales de tu negocio
-            veterinario desde un solo lugar.
-
+            KION es un sistema de punto de venta e inventario diseñado para ayudarte a controlar las ventas, productos, usuarios y sucursales de tu negocio veterinario desde un solo lugar.
         </p>
 
-
         <div class="hero-buttons">
-
-            <a href="#" class="btn-primary">
-                Comenzar ahora
-            </a>
-
-
-            <a href="#funciones" class="btn-secondary">
-                Conocer KION
-            </a>
-
+            <a href="../../../../inicioSesion.php" class="btn-primary">Comenzar ahora</a>
+            <a href="#funciones" class="btn-secondary">Conocer KION</a>
         </div>
-
     </div>
-
-
 
     <!-- MOCKUP DEL SISTEMA -->
-
     <div class="hero-visual">
-
         <div class="dashboard">
-
-
             <div class="dashboard-top">
-
-                <div class="dashboard-title">
-                    Panel de KION
-                </div>
-
-
+                <div class="dashboard-title">Panel de KION</div>
                 <div class="dashboard-user">
-                    🐾
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                 </div>
-
             </div>
-
-
 
             <div class="dashboard-stats">
-
-
                 <div class="stat">
-
-                    <small>
-                        Ventas
-                    </small>
-
-                    <strong>
-                        $24,580
-                    </strong>
-
+                    <small>Ventas hoy</small>
+                    <strong>$24,580</strong>
                 </div>
-
-
                 <div class="stat">
-
-                    <small>
-                        Productos
-                    </small>
-
-                    <strong>
-                        328
-                    </strong>
-
+                    <small>Productos</small>
+                    <strong>328</strong>
                 </div>
-
-
                 <div class="stat">
-
-                    <small>
-                        Sucursales
-                    </small>
-
-                    <strong>
-                        4
-                    </strong>
-
+                    <small>Sucursales</small>
+                    <strong>4</strong>
                 </div>
-
-
             </div>
-
-
 
             <div class="dashboard-content">
-
-
                 <div class="chart">
-
-                    <h4>
-                        Ventas recientes
-                    </h4>
-
-
+                    <h4>Ventas recientes</h4>
                     <div class="bars">
-
                         <div class="bar bar1"></div>
-
                         <div class="bar bar2"></div>
-
                         <div class="bar bar3"></div>
-
                         <div class="bar bar4"></div>
-
                         <div class="bar bar5"></div>
-
                     </div>
-
                 </div>
-
-
 
                 <div class="inventory">
-
-                    <h4>
-                        Inventario
-                    </h4>
-
-
+                    <h4>Inventario</h4>
                     <div class="inventory-item">
-
-                        <span>
-                            Alimentos
-                        </span>
-
-                        <span class="available">
-                            125
-                        </span>
-
+                        <span>Alimentos</span>
+                        <span class="available">125</span>
                     </div>
-
-
                     <div class="inventory-item">
-
-                        <span>
-                            Medicamentos
-                        </span>
-
-                        <span class="available">
-                            48
-                        </span>
-
+                        <span>Medicamentos</span>
+                        <span class="available">48</span>
                     </div>
-
-
                     <div class="inventory-item">
-
-                        <span>
-                            Accesorios
-                        </span>
-
-                        <span class="available">
-                            73
-                        </span>
-
+                        <span>Accesorios</span>
+                        <span class="available">73</span>
                     </div>
-
-
                 </div>
-
             </div>
-
         </div>
-
     </div>
-
 </section>
-
-
 
 <!-- =====================================================
      INTRO
 ===================================================== -->
-
 <section class="intro">
-
-    Una solución pensada para
-    <strong>veterinarias que quieren tener el control de su negocio.</strong>
-
+    Una solución pensada para <strong>veterinarias que quieren tener el control de su negocio.</strong>
 </section>
 
-
-
 <!-- =====================================================
-     FUNCIONES
+     FUNCIONES PRINCIPALES
 ===================================================== -->
-
 <section class="features-section" id="funciones">
-
-
-    <div class="section-label">
-        TODO EN UN SOLO LUGAR
-    </div>
-
-
-    <h2 class="section-title">
-        Todo lo que tu veterinaria necesita
-    </h2>
-
-
+    <div class="section-label">TODO EN UN SOLO LUGAR</div>
+    <h2 class="section-title">Todo lo que tu veterinaria necesita</h2>
     <p class="section-description">
-
-        KION reúne las herramientas necesarias para
-        administrar las operaciones de tu negocio
-        de manera sencilla y organizada.
-
+        KION reúne las herramientas necesarias para administrar las operaciones de tu negocio de manera sencilla y organizada.
     </p>
-
-
 
     <div class="features-grid">
-
-
         <div class="feature-card">
-
             <div class="feature-icon">
-                🛒
+                <svg class="kion-icon kion-icon-float" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
             </div>
-
-            <h3>
-                Punto de venta
-            </h3>
-
-            <p>
-                Registra las ventas de alimentos,
-                medicamentos, accesorios y productos
-                veterinarios de manera rápida.
-            </p>
-
+            <h3>Punto de venta</h3>
+            <p>Registra las ventas de alimentos, medicamentos, accesorios y productos veterinarios al instante.</p>
         </div>
 
-
-
         <div class="feature-card">
-
             <div class="feature-icon">
-                📦
+                <svg class="kion-icon kion-icon-float" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation-delay: 0.3s"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
             </div>
-
-            <h3>
-                Inventario
-            </h3>
-
-            <p>
-                Mantén controladas las existencias
-                de los productos de tu veterinaria.
-            </p>
-
+            <h3>Gestión de Inventario</h3>
+            <p>Mantén controladas las existencias y alertas de stock de tus productos en cada sucursal.</p>
         </div>
 
-
-
         <div class="feature-card">
-
             <div class="feature-icon">
-                🏪
+                <svg class="kion-icon kion-icon-float" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation-delay: 0.6s"><path d="M3 21h18"></path><path d="M5 21V7l8-4v18"></path><path d="M19 21V11l-6-4"></path><path d="M9 9h1"></path><path d="M9 13h1"></path><path d="M9 17h1"></path></svg>
             </div>
-
-            <h3>
-                Sucursales
-            </h3>
-
-            <p>
-                Administra diferentes sucursales
-                desde un mismo sistema.
-            </p>
-
+            <h3>Multi-Sucursal</h3>
+            <p>Administra diferentes sucursales y sedes centralizadamente desde un mismo sistema.</p>
         </div>
 
-
-
         <div class="feature-card">
-
             <div class="feature-icon">
-                👥
+                <svg class="kion-icon kion-icon-float" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation-delay: 0.9s"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
             </div>
-
-            <h3>
-                Usuarios
-            </h3>
-
-            <p>
-                Gestiona los accesos y funciones
-                de gerentes y cajeros.
-            </p>
-
+            <h3>Control de Personal</h3>
+            <p>Gestiona los accesos y funciones de administradores, gerentes y cajeros.</p>
         </div>
-
     </div>
-
 </section>
 
-
-
 <!-- =====================================================
-     VETERINARIAS
+     DEMOSTRACIÓN DE VENTAS E INVENTARIO
 ===================================================== -->
-
-<section class="vet-section" id="nosotros">
-
-
-    <div class="vet-text">
-
-        <div class="section-label">
-            PENSADO PARA VETERINARIAS
-        </div>
-
-
-        <h2>
-            Tu veterinaria necesita más que una caja.
-        </h2>
-
-
-        <p>
-
-            Administrar una veterinaria implica mucho más
-            que realizar ventas. También necesitas controlar
-            productos, existencias, sucursales y usuarios.
-
-        </p>
-
-
-        <ul class="check-list">
-
-            <li>
-                ✓ Control de productos veterinarios
-            </li>
-
-            <li>
-                ✓ Registro de ventas
-            </li>
-
-            <li>
-                ✓ Inventario actualizado
-            </li>
-
-            <li>
-                ✓ Administración de sucursales
-            </li>
-
-            <li>
-                ✓ Usuarios con diferentes funciones
-            </li>
-
-        </ul>
-
-    </div>
-
-
-
-    <div class="vet-visual">
-
-        <div class="paw paw-one">
-            🐾
-        </div>
-
-        <div class="paw paw-two">
-            🐾
-        </div>
-
-
-        <div class="vet-card">
-
-
-            <div class="vet-card-header">
-
-                <div class="vet-icon">
-                    🐶
-                </div>
-
-                <div>
-
-                    <h3>
-                        Productos veterinarios
-                    </h3>
-
-                </div>
-
-            </div>
-
-
-            <div class="vet-row">
-
-                <span>
-                    Alimentos
-                </span>
-
-                <strong>
-                    125
-                </strong>
-
-            </div>
-
-
-            <div class="vet-row">
-
-                <span>
-                    Medicamentos
-                </span>
-
-                <strong>
-                    48
-                </strong>
-
-            </div>
-
-
-            <div class="vet-row">
-
-                <span>
-                    Accesorios
-                </span>
-
-                <strong>
-                    73
-                </strong>
-
-            </div>
-
-
-            <div class="vet-row">
-
-                <span>
-                    Productos agropecuarios
-                </span>
-
-                <strong>
-                    91
-                </strong>
-
-            </div>
-
-        </div>
-
-    </div>
-
-</section>
-
-
-
-<!-- =====================================================
-     VENTAS
-===================================================== -->
-
 <section class="sales-section" id="ventas">
-
-
     <div class="sales-visual">
-
         <div class="sale-screen">
-
-            <h3>
-                Nueva venta
-            </h3>
-
-
+            <h3>Punto de venta activo</h3>
             <div class="sale-item">
-
-                <span>
-                    Alimento para perro
-                </span>
-
-                <strong>
-                    $450
-                </strong>
-
+                <span>Alimento para perro (15kg)</span>
+                <strong>$450.00</strong>
             </div>
-
-
             <div class="sale-item">
-
-                <span>
-                    Medicamento
-                </span>
-
-                <strong>
-                    $280
-                </strong>
-
+                <span>Antibiótico veterinario</span>
+                <strong>$280.00</strong>
             </div>
-
-
             <div class="sale-item">
-
-                <span>
-                    Accesorio
-                </span>
-
-                <strong>
-                    $190
-                </strong>
-
+                <span>Collar antipulgas</span>
+                <strong>$190.00</strong>
             </div>
-
-
             <div class="sale-total">
-
-                <span>
-                    Total
-                </span>
-
-                <span>
-                    $920
-                </span>
-
+                <span>Total</span>
+                <span>$920.00</span>
             </div>
-
         </div>
-
     </div>
-
-
 
     <div class="sales-text">
-
-        <div class="section-label">
-            PUNTO DE VENTA
-        </div>
-
-
-        <h2>
-            Vende de forma rápida y organizada.
-        </h2>
-
-
-        <p>
-
-            Registra cada operación desde el punto de venta
-            y mantén la información de tu negocio organizada.
-
-        </p>
-
-
+        <div class="section-label">PUNTO DE VENTA E INVENTARIO</div>
+        <h2>Vende de forma rápida y mantén la información actualizada.</h2>
+        <p>Registra cada operación al instante y consulta existencias en tiempo real sin complicaciones.</p>
         <ul class="check-list">
-
             <li>
-                ✓ Registro de ventas
+                <div class="check-icon-badge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+                <span>Registro inmediato de ventas e ingresos</span>
             </li>
-
             <li>
-                ✓ Productos veterinarios
+                <div class="check-icon-badge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+                <span>Categorización de alimentos, medicamentos y accesorios</span>
             </li>
-
             <li>
-                ✓ Control por sucursal
+                <div class="check-icon-badge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+                <span>Descuento automático de existencias en inventario</span>
             </li>
-
             <li>
-                ✓ Actualización del inventario
+                <div class="check-icon-badge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+                <span>Control por sucursal y reporte de operaciones</span>
             </li>
-
         </ul>
-
     </div>
-
 </section>
 
-
-
 <!-- =====================================================
-     INVENTARIO
+     SUCURSALES Y ROLES
 ===================================================== -->
-
-<section class="inventory-section" id="inventario">
-
-
-    <div class="inventory-text">
-
-        <div class="section-label">
-            INVENTARIO
-        </div>
-
-
-        <h2>
-            Mantén tus productos bajo control.
-        </h2>
-
-
-        <p>
-
-            Con KION puedes consultar las existencias
-            de los productos de tu veterinaria y mantener
-            organizada la información de cada sucursal.
-
-        </p>
-
-
-        <ul class="check-list">
-
-            <li>
-                ✓ Consulta de existencias
-            </li>
-
-            <li>
-                ✓ Organización por productos
-            </li>
-
-            <li>
-                ✓ Control por sucursal
-            </li>
-
-            <li>
-                ✓ Actualización después de una venta
-            </li>
-
-        </ul>
-
-    </div>
-
-
-
-    <div class="inventory-visual">
-
-        <h3 style="margin-bottom:25px;">
-            Inventario de productos
-        </h3>
-
-
-        <div class="inventory-table">
-
-
-            <div class="table-header">
-
-                <span>
-                    Producto
-                </span>
-
-                <span>
-                    Existencia
-                </span>
-
-                <span>
-                    Estado
-                </span>
-
-            </div>
-
-
-            <div class="table-row">
-
-                <span>
-                    Alimento
-                </span>
-
-                <span>
-                    125
-                </span>
-
-                <span class="stock-good">
-                    Disponible
-                </span>
-
-            </div>
-
-
-            <div class="table-row">
-
-                <span>
-                    Medicamentos
-                </span>
-
-                <span>
-                    48
-                </span>
-
-                <span class="stock-good">
-                    Disponible
-                </span>
-
-            </div>
-
-
-            <div class="table-row">
-
-                <span>
-                    Accesorios
-                </span>
-
-                <span>
-                    73
-                </span>
-
-                <span class="stock-good">
-                    Disponible
-                </span>
-
-            </div>
-
-
-            <div class="table-row">
-
-                <span>
-                    Producto agropecuario
-                </span>
-
-                <span>
-                    8
-                </span>
-
-                <span class="stock-low">
-                    Bajo
-                </span>
-
-            </div>
-
-        </div>
-
-    </div>
-
-</section>
-
-
-
-<!-- =====================================================
-     SUCURSALES
-===================================================== -->
-
 <section class="branches" id="sucursales">
-
-
-    <div class="section-label">
-        MULTI-SUCURSAL
-    </div>
-
-
-    <h2 class="section-title">
-        Una sola plataforma para todas tus sucursales
-    </h2>
-
-
-    <p class="section-description">
-
-        Centraliza la información y facilita la administración
-        de cada punto de venta de tu negocio veterinario.
-
-    </p>
-
-
+    <div class="section-label">MULTI-SUCURSAL Y ROLES</div>
+    <h2 class="section-title">Una sola plataforma para todas tus sucursales</h2>
+    <p class="section-description">Centraliza la información y facilita la administración de cada punto de venta.</p>
 
     <div class="branches-grid">
-
-
         <div class="branch">
-
             <div class="branch-icon">
-                🏪
+                <svg class="kion-icon kion-icon-pulse" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"></path><path d="M5 21V7l8-4v18"></path><path d="M19 21V11l-6-4"></path></svg>
             </div>
-
-            <h3>
-                Sucursal
-            </h3>
-
-            <p>
-                Administra los productos y operaciones
-                correspondientes a cada sucursal.
-            </p>
-
+            <h3>Sucursales</h3>
+            <p>Administra los productos y existencias de cada sede de forma independiente.</p>
         </div>
 
-
-
         <div class="branch">
-
             <div class="branch-icon">
-                👨‍💼
+                <svg class="kion-icon kion-icon-pulse" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation-delay: 0.3s"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><polygon points="12 11 14 15 10 15 12 11"></polygon></svg>
             </div>
-
-            <h3>
-                Gerentes
-            </h3>
-
-            <p>
-                Los responsables de cada sede pueden
-                gestionar las operaciones de su sucursal.
-            </p>
-
+            <h3>Gerentes</h3>
+            <p>Los responsables de cada sede supervisan las operaciones y stock local.</p>
         </div>
 
-
-
         <div class="branch">
-
             <div class="branch-icon">
-                👩‍💻
+                <svg class="kion-icon kion-icon-pulse" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation-delay: 0.6s"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
             </div>
-
-            <h3>
-                Cajeros
-            </h3>
-
-            <p>
-                Realizan las ventas y consultan la
-                información necesaria para trabajar.
-            </p>
-
+            <h3>Cajeros</h3>
+            <p>Realizan los cobros diarios y atienden el punto de venta de forma ágil.</p>
         </div>
-
     </div>
-
 </section>
 
-
-
 <!-- =====================================================
-     COMO FUNCIONA
+     PASOS
 ===================================================== -->
-
-<section class="steps">
-
-
-    <div class="section-label">
-        SIMPLE Y ORGANIZADO
-    </div>
-
-
-    <h2 class="section-title">
-        Comienza a utilizar KION
-    </h2>
-
-
-    <p class="section-description">
-
-        Organiza las operaciones de tu veterinaria
-        desde un solo sistema.
-
-    </p>
-
-
+<section class="steps" id="nosotros">
+    <div class="section-label">SIMPLE Y ORGANIZADO</div>
+    <h2 class="section-title">Comienza a utilizar KION en 3 pasos</h2>
+    <p class="section-description">Organiza las operaciones de tu veterinaria sin complicaciones.</p>
 
     <div class="steps-grid">
-
-
         <div class="step">
-
-            <div class="step-number">
-                01
-            </div>
-
-            <h3>
-                Registra
-            </h3>
-
-            <p>
-                Agrega tus productos, sucursales
-                y usuarios al sistema.
-            </p>
-
+            <div class="step-number">01</div>
+            <h3>Ingresa</h3>
+            <p>Inicia sesión en tu cuenta para acceder al sistema.</p>
         </div>
 
-
-
         <div class="step">
-
-            <div class="step-number">
-                02
-            </div>
-
-            <h3>
-                Administra
-            </h3>
-
-            <p>
-                Controla inventario, usuarios
-                y operaciones de cada sucursal.
-            </p>
-
+            <div class="step-number">02</div>
+            <h3>Administra</h3>
+            <p>Controla inventario, existencias y permisos de cada sucursal.</p>
         </div>
 
-
-
         <div class="step">
-
-            <div class="step-number">
-                03
-            </div>
-
-            <h3>
-                Vende
-            </h3>
-
-            <p>
-                Registra las ventas y mantén
-                actualizado tu inventario.
-            </p>
-
+            <div class="step-number">03</div>
+            <h3>Vende</h3>
+            <p>Registra ventas y mantén actualizada la información de tu negocio.</p>
         </div>
-
     </div>
-
 </section>
-
-
-
-<!-- =====================================================
-     BENEFICIOS
-===================================================== -->
-
-<section class="benefits">
-
-
-    <div class="section-label">
-        ¿POR QUÉ KION?
-    </div>
-
-
-    <h2 class="section-title">
-        Menos complicaciones. Más control.
-    </h2>
-
-
-
-    <div class="benefits-grid">
-
-
-        <div class="benefit">
-
-            <strong>
-                🐾 Especializado
-            </strong>
-
-            <p>
-                Diseñado pensando en las necesidades
-                de negocios veterinarios.
-            </p>
-
-        </div>
-
-
-
-        <div class="benefit">
-
-            <strong>
-                ⚡ Sencillo
-            </strong>
-
-            <p>
-                Una interfaz pensada para facilitar
-                las operaciones diarias.
-            </p>
-
-        </div>
-
-
-
-        <div class="benefit">
-
-            <strong>
-                📦 Organizado
-            </strong>
-
-            <p>
-                Mantén tus productos e información
-                organizada.
-            </p>
-
-        </div>
-
-
-
-        <div class="benefit">
-
-            <strong>
-                🏪 Centralizado
-            </strong>
-
-            <p>
-                Gestiona las diferentes sucursales
-                desde un mismo sistema.
-            </p>
-
-        </div>
-
-    </div>
-
-</section>
-
-
 
 <!-- =====================================================
      CTA
 ===================================================== -->
-
 <section class="cta">
-
-
-    <h2>
-        Tu veterinaria necesita control.
-    </h2>
-
-
-    <p>
-        Ventas, inventario y sucursales en un solo lugar.
-    </p>
-
-
-    <a href="#" class="btn-primary">
-        Comenzar con KION
-    </a>
-
+    <h2>Tu veterinaria necesita control.</h2>
+    <p>Ventas, inventario y sucursales en un solo lugar.</p>
+    <a href="../../../../inicioSesion.php" class="btn-primary">Comenzar con KION</a>
 </section>
-
-
 
 <!-- =====================================================
      FOOTER
 ===================================================== -->
-
 <footer>
-
-
     <div class="logo">
         KI<span>O</span>N
     </div>
-
-
-    <p>
-        © 2026 KION · Punto de Venta e Inventario para Veterinarias
-    </p>
-
-
+    <p>© 2026 KION · Punto de Venta e Inventario para Veterinarias</p>
 </footer>
 
-
-
 <!-- =====================================================
-     JAVASCRIPT MODO OSCURO
+     JAVASCRIPT MODO OSCURO E IDIOMA
 ===================================================== -->
-
 <script>
-
     const darkModeBtn = document.getElementById("darkModeBtn");
-
-
     darkModeBtn.addEventListener("click", function () {
-
         document.body.classList.toggle("dark-mode");
-
-
-        if (document.body.classList.contains("dark-mode")) {
-
-            darkModeBtn.innerHTML = "☀️";
-
-        } else {
-
-            darkModeBtn.innerHTML = "🌙";
-
-        }
-
     });
-
 </script>
 
 <script>
     const homeTranslations = {
-        'Inicio': 'Home', 'Funciones': 'Features', 'Ventas': 'Sales', 'Inventario': 'Inventory',
-        'Sucursales': 'Branches', 'Nosotros': 'About us', 'Iniciar sesión': 'Sign in',
-        '🐾 SOFTWARE PARA VETERINARIAS': '🐾 SOFTWARE FOR VETERINARY CLINICS',
+        'Inicio': 'Home', 'Catálogo': 'Catalog', 'Iniciar sesión': 'Sign in',
+        'Perfil': 'Profile', 'Cerrar sesión': 'Sign out', 'SOFTWARE PARA VETERINARIAS': 'SOFTWARE FOR VETERINARY CLINICS',
         'La administración': 'Managing', 'de tu veterinaria,': 'your veterinary clinic,', 'más fácil.': 'made easier.',
         'Comenzar ahora': 'Get started', 'Conocer KION': 'Discover KION', 'Panel de KION': 'KION dashboard',
+        'Ventas hoy': 'Today sales', 'Productos': 'Products', 'Sucursales': 'Branches',
         'Ventas recientes': 'Recent sales', 'Alimentos': 'Food', 'Medicamentos': 'Medicine', 'Accesorios': 'Accessories',
-        'Productos agropecuarios': 'Agricultural products', 'TODO EN UN SOLO LUGAR': 'EVERYTHING IN ONE PLACE',
+        'TODO EN UN SOLO LUGAR': 'EVERYTHING IN ONE PLACE',
         'Todo lo que tu veterinaria necesita': 'Everything your veterinary clinic needs',
-        'Punto de venta': 'Point of sale', 'Usuarios': 'Users', 'PENSADO PARA VETERINARIAS': 'DESIGNED FOR VETERINARY CLINICS',
-        'Tu veterinaria necesita más que una caja.': 'Your veterinary clinic needs more than a register.',
-        'PUNTO DE VENTA': 'POINT OF SALE', 'Vende de forma rápida y organizada.': 'Sell quickly and stay organized.',
-        'Mantén tus productos bajo control.': 'Keep your products under control.',
-        'MULTI-SUCURSAL': 'MULTI-BRANCH', 'Una sola plataforma para todas tus sucursales': 'One platform for all your branches',
-        'SIMPLE Y ORGANIZADO': 'SIMPLE AND ORGANIZED', 'Comienza a utilizar KION': 'Start using KION',
-        '¿POR QUÉ KION?': 'WHY KION?', 'Menos complicaciones. Más control.': 'Less hassle. More control.',
-        'Tu veterinaria necesita control.': 'Your veterinary clinic needs control.', 'Comenzar con KION': 'Get started with KION',
+        'Punto de venta': 'Point of sale', 'Gestión de Inventario': 'Inventory Management',
+        'Multi-Sucursal': 'Multi-Branch', 'Control de Personal': 'Staff Control',
+        'PUNTO DE VENTA E INVENTARIO': 'POINT OF SALE AND INVENTORY',
+        'Vende de forma rápida y mantén la información actualizada.': 'Sell quickly and keep information up to date.',
+        'MULTI-SUCURSAL Y ROLES': 'MULTI-BRANCH AND ROLES',
+        'Una sola plataforma para todas tus sucursales': 'One platform for all your branches',
+        'Gerentes': 'Managers', 'Cajeros': 'Cashiers',
+        'SIMPLE Y ORGANIZADO': 'SIMPLE AND ORGANIZED',
+        'Comienza a utilizar KION en 3 pasos': 'Start using KION in 3 steps',
+        'Ingresa': 'Log in', 'Administra': 'Manage', 'Vende': 'Sell',
+        'Tu veterinaria necesita control.': 'Your veterinary clinic needs control.',
+        'Comenzar con KION': 'Get started with KION',
         'KION es un sistema de punto de venta e inventario diseñado para ayudarte a controlar las ventas, productos, usuarios y sucursales de tu negocio veterinario desde un solo lugar.': 'KION is a point-of-sale and inventory system designed to help you manage sales, products, users, and branches from one place.',
-        'KION reúne las herramientas necesarias para administrar las operaciones de tu negocio de manera sencilla y organizada.': 'KION brings together the tools you need to manage your business simply and efficiently.',
-        'Registra las ventas de alimentos, medicamentos, accesorios y productos veterinarios de manera rápida.': 'Record food, medicine, accessories, and veterinary product sales quickly.',
-        'Mantén controladas las existencias de los productos de tu veterinaria.': 'Keep track of your veterinary clinic inventory.',
-        'Administra diferentes sucursales desde un mismo sistema.': 'Manage different branches from one system.',
-        'Gestiona los accesos y funciones de gerentes y cajeros.': 'Manage manager and cashier access and permissions.',
-        'Administrar una veterinaria implica mucho más que realizar ventas. También necesitas controlar productos, existencias, sucursales y usuarios.': 'Managing a veterinary clinic involves more than making sales. You also need to control products, inventory, branches, and users.',
-        'Registra cada operación desde el punto de venta y mantén la información de tu negocio organizada.': 'Record every transaction at the point of sale and keep your business information organized.',
-        'Con KION puedes consultar las existencias de los productos de tu veterinaria y mantener organizada la información de cada sucursal.': 'With KION, you can check product stock and keep each branch organized.',
-        'Centraliza la información y facilita la administración de cada punto de venta de tu negocio veterinario.': 'Centralize information and simplify the management of every veterinary branch.',
-        'Administra los productos y operaciones correspondientes a cada sucursal.': 'Manage the products and operations for each branch.',
-        'Los responsables de cada sede pueden gestionar las operaciones de su sucursal.': 'Branch managers can manage their location operations.',
-        'Realizan las ventas y consultan la información necesaria para trabajar.': 'They make sales and access the information they need to work.',
-        'Organiza las operaciones de tu veterinaria desde un solo sistema.': 'Organize your veterinary clinic operations from one system.',
-        'Agrega tus productos, sucursales y usuarios al sistema.': 'Add your products, branches, and users to the system.',
-        'Controla inventario, usuarios y operaciones de cada sucursal.': 'Control inventory, users, and every branch operation.',
-        'Registra las ventas y mantén actualizado tu inventario.': 'Record sales and keep your inventory updated.',
-        'Diseñado pensando en las necesidades de negocios veterinarios.': 'Designed for the needs of veterinary businesses.',
-        'Una interfaz pensada para facilitar las operaciones diarias.': 'An interface designed to simplify daily operations.',
-        'Mantén tus productos e información organizada.': 'Keep your products and information organized.',
-        'Gestiona las diferentes sucursales desde un mismo sistema.': 'Manage different branches from one system.',
-        'alimentos': 'food', 'medicamentos': 'medicine', 'accesorios': 'accessories', 'productos': 'products',
-        '✓ Control de productos veterinarios': '✓ Veterinary product control', '✓ Registro de ventas': '✓ Sales recording',
-        '✓ Inventario actualizado': '✓ Updated inventory', '✓ Administración de sucursales': '✓ Branch management',
-        '✓ Usuarios con diferentes funciones': '✓ Users with different permissions', '✓ Productos veterinarios': '✓ Veterinary products',
-        '✓ Control por sucursal': '✓ Branch-based control', '✓ Actualización del inventario': '✓ Inventory updates',
-        '✓ Consulta de existencias': '✓ Check inventory', '✓ Organización por productos': '✓ Organized by product',
-        '✓ Actualización después de una venta': '✓ Updated after every sale',
-        'Inventario de productos': 'Product inventory', 'Producto': 'Product', 'Existencia': 'Stock',
-        'Estado': 'Status', 'Disponible': 'Available', 'Bajo': 'Low', 'Sucursal': 'Branch',
-        'Gerentes': 'Managers', 'Cajeros': 'Cashiers', 'Nueva venta': 'New sale', 'Total': 'Total',
-        'Registra': 'Register', 'Administra': 'Manage', 'Vende': 'Sell', 'Especializado': 'Specialized',
-        'Sencillo': 'Simple', 'Organizado': 'Organized', 'Centralizado': 'Centralized',
-        '🐾 Especializado': '🐾 Specialized', '⚡ Sencillo': '⚡ Simple', '📦 Organizado': '📦 Organized', '🏪 Centralizado': '🏪 Centralized',
         '© 2026 KION · Punto de Venta e Inventario para Veterinarias': '© 2026 KION · Point of Sale and Inventory for Veterinary Clinics'
     };
 
@@ -3009,7 +2268,5 @@
         toggleHomeLanguage();
     });
 </script>
-
-
 </body>
 </html>

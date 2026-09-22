@@ -1,8 +1,20 @@
 <?php
 declare(strict_types=1);
 
-// Escudo contra espacios en blanco que rompan el JSON
 ob_start();
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
+
+if (!isset($_SESSION['usuario']) && !isset($_GET['action'])) {
+    header('Location: ../../../../inicioSesion.php');
+    exit;
+}
 
 if (file_exists(__DIR__ . '/../../config/conexion_BD.php')) {
     require_once __DIR__ . '/../../config/conexion_BD.php';
@@ -173,7 +185,9 @@ if (isset($_GET['action'])) {
             $id=(int)($_POST['id']??0); $nom=trim($_POST['nombre']??''); $cor=trim($_POST['correo']??''); $pas=trim($_POST['password']??''); $rol=(int)($_POST['id_rol']??0);
             $suc=($_POST['id_sucursal']??'')!==''?(int)$_POST['id_sucursal']:null;
             
-            $rname = $pdo->query("SELECT nombre FROM roles WHERE id_rol = $rol")->fetchColumn() ?: '';
+            $st_r = $pdo->prepare("SELECT nombre FROM roles WHERE id_rol = ?");
+            $st_r->execute([$rol]);
+            $rname = $st_r->fetchColumn() ?: '';
             $is_admin = (stripos($rname, 'admin') !== false);
             if (!$is_admin && !$suc) throw new Exception('[ERROR DE USUARIO] Los Gerentes y Cajeros DEBEN tener una sucursal asignada.');
             if ($is_admin) $suc = null;
@@ -208,6 +222,17 @@ if (isset($_GET['action'])) {
             $sql.=" ORDER BY v.fecha_hora DESC LIMIT 200";
             $st=$pdo->prepare($sql);$st->execute($params);
             $out=['ok'=>true,'data'=>$st->fetchAll(PDO::FETCH_ASSOC)];
+
+        } elseif ($action === 'get_venta_detalle') {
+            $id = (int)($_GET['id'] ?? 0);
+            $st = $pdo->prepare("
+                SELECT dv.cantidad, dv.precio_unitario, dv.subtotal, COALESCE(p.nombre, 'Producto no disponible') AS producto
+                FROM detalle_ventas dv
+                LEFT JOIN productos p ON p.id_producto = dv.id_producto
+                WHERE dv.id_venta = ?
+            ");
+            $st->execute([$id]);
+            $out = ['ok' => true, 'data' => $st->fetchAll(PDO::FETCH_ASSOC)];
         }
     } catch(Throwable $e){ 
         $msg = $e->getMessage();
@@ -456,6 +481,11 @@ if(isset($pdo)){
     <li class="nav-item"><a class="nav-link nav-trigger" href="#productos" data-view="productos"><span class="nav-icon">□</span><span class="nav-label">Productos</span></a></li>
     <li class="nav-item"><a class="nav-link nav-trigger" href="#ventas" data-view="ventas"><span class="nav-icon">↗</span><span class="nav-label">Ventas</span></a></li>
             </ul>
+            <div class="nav-section-title" style="margin-top:20px">Navegación</div>
+            <ul class="nav-list">
+                <li class="nav-item"><a class="nav-link" href="home.php"><span class="nav-icon">🏠</span><span class="nav-label">Volver a Home</span></a></li>
+                <li class="nav-item"><a class="nav-link" href="cerrarSesion.php" style="color:var(--danger)"><span class="nav-icon">🚪</span><span class="nav-label">Cerrar sesión</span></a></li>
+            </ul>
         </div>
     </aside>
     <div class="sidebar-scrim" id="sidebarScrim"></div>
@@ -584,16 +614,16 @@ function toast(message, kind='success'){ const el=document.createElement('div');
 async function updateMetricsUI(){
     try {
         const { data } = await request('get_metrics');
-        $('#metricSucursales').textContent = Number(data.ts).toLocaleString();
-        $('#metricUsuarios').textContent = Number(data.tu).toLocaleString();
-        $('#metricProductos').textContent = Number(data.tp).toLocaleString();
-        $('#metricIngresos').textContent = '$' + Number(data.ih).toFixed(2);
-        $('#metricVentasCount').textContent = Number(data.vh).toLocaleString() + ' ventas';
-        $('#donutVentasCount').textContent = Number(data.vh).toLocaleString();
-        $('#metricInventarioTotal').textContent = Number(data.ti).toLocaleString();
-        $('#metricValorInventario').textContent = '$' + Number(data.valor_inv).toFixed(2);
-        $('#badgeSucursales').textContent = data.ts;
-        $('#badgeProductos').textContent = data.tp;
+        if($('#metricSucursales')) $('#metricSucursales').textContent = Number(data.ts).toLocaleString();
+        if($('#metricUsuarios')) $('#metricUsuarios').textContent = Number(data.tu).toLocaleString();
+        if($('#metricProductos')) $('#metricProductos').textContent = Number(data.tp).toLocaleString();
+        if($('#metricIngresos')) $('#metricIngresos').textContent = '$' + Number(data.ih).toFixed(2);
+        if($('#metricVentasCount')) $('#metricVentasCount').textContent = Number(data.vh).toLocaleString() + ' ventas';
+        if($('#donutVentasCount')) $('#donutVentasCount').textContent = Number(data.vh).toLocaleString();
+        if($('#metricInventarioTotal')) $('#metricInventarioTotal').textContent = Number(data.ti).toLocaleString();
+        if($('#metricValorInventario')) $('#metricValorInventario').textContent = '$' + Number(data.valor_inv).toFixed(2);
+        if($('#badgeSucursales')) $('#badgeSucursales').textContent = data.ts;
+        if($('#badgeProductos')) $('#badgeProductos').textContent = data.tp;
     } catch(e) {}
 }
 
@@ -602,7 +632,7 @@ document.addEventListener('click', e=>{ const trigger=e.target.closest('.nav-tri
 
 // RESTAURACIÓN BOTONES DE BORRADO
 async function loadSucursales(){ try{ const {data}=await request('get_sucursales'); $('#sucursalesTable').innerHTML=data.length?data.map(x=>`<tr><td><b>${escapeHtml(x.nombre)}</b></td><td>${escapeHtml(x.direccion)}</td><td>${escapeHtml(x.telefono)}</td><td>${escapeHtml(x.contacto)}</td><td>${statusBadge(x.estado)}</td><td class="row-actions"><button class="chip-btn" data-edit-sucursal='${JSON.stringify(x).replace(/'/g,'&#39;')}'>Editar</button><button class="icon-chip" aria-label="Eliminar" data-delete-sucursal="${x.id_sucursal}">×</button></td></tr>`).join(''):empty(6); }catch(e){} }
-async function loadUsuarios(){ try{ const {data}=await request('get_gerentes'); $('#usuariosTable').innerHTML=data.length?data.map(x=>`<tr><td><b>${escapeHtml(x.nombre)} ${escapeHtml(x.apellido)}</b><br><small>${escapeHtml(x.correo)}</small></td><td>${escapeHtml(x.rol)}</td><td>${escapeHtml(x.sucursal)}</td><td>${statusBadge(x.estado)}</td><td class="row-actions"><button class="chip-btn" data-edit-usuario='${JSON.stringify(x).replace(/'/g,'&#39;')}'>Editar</button><button class="icon-chip" aria-label="Eliminar" data-delete-usuario="${x.id_usuario}">×</button></td></tr>`).join(''):empty(5); }catch(e){} }
+async function loadUsuarios(){ try{ const {data}=await request('get_gerentes'); $('#usuariosTable').innerHTML=data.length?data.map(x=>`<tr><td><b>${escapeHtml(x.nombre)} ${escapeHtml(x.apellido||'')}</b><br><small>${escapeHtml(x.correo)}</small></td><td>${escapeHtml(x.rol)}</td><td>${escapeHtml(x.sucursal)}</td><td>${statusBadge(x.estado)}</td><td class="row-actions"><button class="chip-btn" data-edit-usuario='${JSON.stringify(x).replace(/'/g,'&#39;')}'>Editar</button><button class="icon-chip" aria-label="Eliminar" data-delete-usuario="${x.id_usuario}">×</button></td></tr>`).join(''):empty(5); }catch(e){} }
 async function loadInventario(){ try{ const q=$('#inventorySearch').value, suc=$('#inventoryBranch').value; const {data}=await request(`get_inventarios&q=${encodeURIComponent(q)}&sucursal=${encodeURIComponent(suc)}`); $('#inventarioTable').innerHTML=data.length?data.map(x=>{const type=x.nivel==='AGOTADO'?'critical':x.nivel==='BAJO'?'low':'watch';return `<tr><td><b>${escapeHtml(x.producto)}</b><br><small>${escapeHtml(x.codigo)}</small></td><td>${escapeHtml(x.sucursal)}</td><td><b>${escapeHtml(x.existencias)}</b> <small>/ mín. ${escapeHtml(x.stock_minimo)}</small></td><td>$${Number(x.precio).toFixed(2)}</td><td><span class="level-tag ${type}"><i class="bdot"></i>${escapeHtml(x.nivel)}</span></td></tr>`}).join(''):empty(5); }catch(e){} }
 async function loadProductos(){ try{ const q=$('#productsSearch').value; const {data}=await request(`get_productos&q=${encodeURIComponent(q)}`); $('#productosTable').innerHTML=data.length?data.map(x=>`<tr><td><b>${escapeHtml(x.codigo)}</b></td><td><b>${escapeHtml(x.nombre)}</b></td><td>${escapeHtml(x.categoria)}</td><td>$${Number(x.precio).toFixed(2)}</td><td>${statusBadge(x.estado)}</td><td class="row-actions"><button class="chip-btn" data-view-producto="${x.id_producto}">Ver stock</button><button class="chip-btn" data-edit-producto='${JSON.stringify(x).replace(/'/g,'&#39;')}'>Editar</button><button class="icon-chip" aria-label="Eliminar" data-delete-producto="${x.id_producto}">×</button></td></tr>`).join(''):empty(6); }catch(e){} }
 async function loadVentas(){ try{ const p=new URLSearchParams({sucursal:$('#salesBranch').value,desde:$('#salesFrom').value,hasta:$('#salesTo').value}); const {data}=await request(`get_ventas&${p}`); $('#ventasTable').innerHTML=data.length?data.map(x=>`<tr><td>#${escapeHtml(x.id_venta)}</td><td>${new Date(x.fecha_hora).toLocaleString('es-MX')}</td><td>${escapeHtml(x.sucursal)}</td><td>${escapeHtml(x.empleado)}</td><td>${escapeHtml(x.metodo_pago)}</td><td><b>$${Number(x.total).toFixed(2)}</b></td><td>${statusBadge(x.estado)}</td><td class="row-actions"><button class="chip-btn" data-view-venta="${x.id_venta}">Ver</button></td></tr>`).join(''):empty(8); }catch(e){} }
@@ -639,7 +669,16 @@ function openModal(type, record={}){
     `;
   } else {
     $('#modalTitle').textContent = editing ? 'Editar Personal' : 'Nuevo Personal';
-    fields=`<input type="hidden" name="id" value="${record.id_usuario||''}"><div class="form-group"><label class="form-label">Nombre *</label><input class="form-input" required name="nombre" value="${escapeHtml(record.nombre||'')}"></div><div class="form-group"><label class="form-label">Correo *</label><input class="form-input" required type="email" name="correo" value="${escapeHtml(record.correo||'')}"></div><div class="form-group"><label class="form-label">Rol *</label><select class="form-select" required name="id_rol" id="formRole"></select></div><div class="form-group"><label class="form-label">Sucursal</label><select class="form-select" name="id_sucursal" id="formBranch"></select></div><div class="form-group"><label class="form-label">Contraseña</label><input class="form-input" ${editing?'':'required'} type="password" name="password"></div>${editing?`<div class="form-group"><label class="form-label">Estado</label><select class="form-select" name="estado"><option ${record.estado==='ACTIVO'?'selected':''}>ACTIVO</option><option ${record.estado==='INACTIVO'?'selected':''}>INACTIVO</option></select></div>`:''}`;
+    fields=`<input type="hidden" name="id" value="${record.id_usuario||''}">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div class="form-group"><label class="form-label">Nombre *</label><input class="form-input" required name="nombre" value="${escapeHtml(record.nombre||'')}"></div>
+    <div class="form-group"><label class="form-label">Apellido</label><input class="form-input" name="apellido" value="${escapeHtml(record.apellido||'')}"></div>
+</div>
+<div class="form-group"><label class="form-label">Correo *</label><input class="form-input" required type="email" name="correo" value="${escapeHtml(record.correo||'')}"></div>
+<div class="form-group"><label class="form-label">Rol *</label><select class="form-select" required name="id_rol" id="formRole"></select></div>
+<div class="form-group"><label class="form-label">Sucursal</label><select class="form-select" name="id_sucursal" id="formBranch"></select></div>
+<div class="form-group"><label class="form-label">Contraseña</label><input class="form-input" ${editing?'':'required'} type="password" name="password"></div>
+${editing?`<div class="form-group"><label class="form-label">Estado</label><select class="form-select" name="estado"><option ${record.estado==='ACTIVO'?'selected':''}>ACTIVO</option><option ${record.estado==='INACTIVO'?'selected':''}>INACTIVO</option></select></div>`:''}`;
   }
   
   $('#entityForm').innerHTML = fields + `<div class="form-actions"><button type="button" class="btn btn-ghost" id="cancelModal">Cancelar</button><button type="submit" class="btn btn-primary" id="btnSaveSubmit">Guardar</button></div>`;

@@ -1,5 +1,17 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
+
+if (isset($_SESSION['usuario'])) {
+    header('Location: src/php/modulos/home/home.php');
+    exit;
+}
+
 $loginError = $_SESSION['login_error'] ?? '';
 unset($_SESSION['login_error']);
 $esPeticionAjax = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
@@ -38,9 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'id_sucursal' => $usuario['id_sucursal'],
                 'rol' => $usuario['rol'],
             ];
-            $destino = $usuario['rol'] === 'Usuario'
-                ? 'src/php/componentes/catalogo.php'
-                : 'src/php/modulos/home/dashboard.php';
+            $destino = 'src/php/modulos/home/home.php';
             if ($esPeticionAjax) {
                 header('Content-Type: application/json; charset=utf-8');
                 echo json_encode(['ok' => true, 'redirect' => $destino]);

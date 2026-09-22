@@ -45,7 +45,7 @@ if ($pdo !== null) {
                     p.nombre, 
                     p.precio, 
                     c.nombre AS categoria,
-                    COALESCE(i.existencias, 10) AS stock,
+                    COALESCE(SUM(i.existencias), 10) AS stock,
                     'KION' AS marca
                 FROM productos p
                 LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
@@ -56,7 +56,7 @@ if ($pdo !== null) {
             $sql .= " AND c.nombre = :categoria";
         }
 
-        $sql .= " ORDER BY p.id_producto ASC";
+        $sql .= " GROUP BY p.id_producto, p.nombre, p.precio, c.nombre ORDER BY p.id_producto ASC";
         $stmt = $pdo->prepare($sql);
 
         if ($categoriaSeleccionada !== null && in_array($categoriaSeleccionada, $categoriasDisponibles, true)) {
