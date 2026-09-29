@@ -1906,7 +1906,18 @@ header("Expires: 0");
         <a href="../../componentes/catalogo.php">Catálogo</a>
 
         <?php if (isset($_SESSION['usuario'])): ?>
-            <a href="dashboard_gerente.php" class="btn-login" style="background: #8d6045; color: #ffffff !important; display: inline-flex; align-items: center; gap: 8px;">
+    <?php
+        // Determinar la ruta correcta según el rol del usuario
+        $rolSesion = strtolower($_SESSION['usuario']['rol'] ?? '');
+        $rutaDashboard = 'dashboard_usuario.php'; // Cliente por defecto
+        
+        if (strpos($rolSesion, 'admin') !== false) {
+            $rutaDashboard = 'dashboard.php';
+        } elseif (strpos($rolSesion, 'gerente') !== false) {
+            $rutaDashboard = 'dashboard_gerente.php';
+        }
+    ?>
+    <a href="<?= $rutaDashboard ?>" class="btn-login" style="background: #8d6045; color: #ffffff !important; display: inline-flex; align-items: center; gap: 8px;">
                 <svg class="kion-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                  <?= htmlspecialchars($_SESSION['usuario']['nombre'], ENT_QUOTES, 'UTF-8') ?>
             </a>

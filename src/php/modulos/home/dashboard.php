@@ -91,10 +91,10 @@ if (isset($_GET['action'])) {
                 ->execute([$nombre, trim($_POST['direccion'] ?? ''), $tel, trim($_POST['contacto'] ?? ''), $est, $id]);
             $out = ['ok' => true, 'msg' => 'Datos de la sucursal actualizados.'];
 
-        } elseif ($action === 'delete_sucursal') {
-            $id = (int)($_POST['id'] ?? 0); if (!$id) throw new Exception('[ERROR DE SISTEMA] ID de sucursal inválido.');
-            $pdo->prepare("DELETE FROM sucursales WHERE id_sucursal=?")->execute([$id]);
-            $out = ['ok' => true, 'msg' => 'Sucursal eliminada.'];
+        } elseif ($action === 'get_gerentes') {
+            
+            $st = $pdo->query("SELECT u.id_usuario,u.nombre,u.apellido,u.correo,u.estado,r.nombre AS rol,COALESCE(s.nombre,'-- Ninguna --') AS sucursal,u.id_sucursal,u.id_rol FROM usuarios u LEFT JOIN roles r ON r.id_rol=u.id_rol LEFT JOIN sucursales s ON s.id_sucursal=u.id_sucursal WHERE r.nombre NOT LIKE '%cliente%' AND r.nombre NOT LIKE '%usuario%' ORDER BY u.id_usuario");
+            $out = ['ok' => true, 'data' => $st->fetchAll(PDO::FETCH_ASSOC)];
 
         } elseif ($action === 'get_gerentes') {
             $st = $pdo->query("SELECT u.id_usuario,u.nombre,u.apellido,u.correo,u.estado,r.nombre AS rol,COALESCE(s.nombre,'-- Ninguna --') AS sucursal,u.id_sucursal,u.id_rol FROM usuarios u LEFT JOIN roles r ON r.id_rol=u.id_rol LEFT JOIN sucursales s ON s.id_sucursal=u.id_sucursal ORDER BY u.id_usuario");

@@ -106,10 +106,10 @@ $rutasImagenes = [
 
     <div style="display: flex; align-items: center; gap: 14px;">
         <a href="../modulos/home/home.php" class="topbar__btn-home" style="display: inline-flex; align-items: center; gap: 6px; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 0.9rem; padding: 7px 14px; border-radius: 10px; background: rgba(255, 255, 255, 0.14); transition: background 0.2s ease;">
-            🏠 Inicio
+            Inicio
         </a>
         <a href="../modulos/home/dashboard.php" class="topbar__btn-dashboard" style="display: inline-flex; align-items: center; gap: 6px; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 0.9rem; padding: 7px 14px; border-radius: 10px; background: rgba(255, 255, 255, 0.14); transition: background 0.2s ease;">
-            📊 Dashboard
+            Dashboard
         </a>
 
         <div class="topbar__carrito" aria-label="Carrito de venta">

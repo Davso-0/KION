@@ -7,8 +7,17 @@ header("Cache-Control: no-cache, no-store, must-revalidate");
 header("Pragma: no-cache");
 header("Expires: 0");
 
+// 1. Redirección inteligente si ya hay sesión iniciada
 if (isset($_SESSION['usuario'])) {
-    header('Location: src/php/modulos/home/home.php');
+    $rolNombre = strtolower(trim($_SESSION['usuario']['rol'] ?? ''));
+    if (strpos($rolNombre, 'admin') !== false) {
+        $destino = 'src/php/modulos/home/dashboard.php';
+    } elseif (strpos($rolNombre, 'gerente') !== false) {
+        $destino = 'src/php/modulos/home/dashboard_gerente.php';
+    } else {
+        $destino = 'src/php/componentes/catalogo.php';
+    }
+    header('Location: ' . $destino);
     exit;
 }
 
@@ -19,16 +28,79 @@ $esPeticionAjax = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest'
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_once __DIR__ . '/src/php/config/conexion_BD.php';
 
+    // =========================================================================
+    // 2. LÓGICA DE ACCESO RÁPIDO (BOTONES DE ROL DEMO) - SIN INSERCIONES
+    // =========================================================================
+    if (isset($_POST['demo_login']) && isset($_POST['rol_demo'])) {
+        $rolDemo = $_POST['rol_demo'];
+        $correoDemo = $rolDemo . "_demo@kion.com";
+
+        try {
+            // Comprobar que el usuario demo ya existe en la BD
+            $consulta = $pdo->prepare('SELECT u.id_usuario, u.nombre, u.apellido, u.correo, u.password_hash, u.id_rol, u.id_sucursal, u.estado, r.nombre AS rol FROM usuarios u LEFT JOIN roles r ON r.id_rol = u.id_rol WHERE u.correo = ? LIMIT 1');
+            $consulta->execute([$correoDemo]);
+            $usuario = $consulta->fetch();
+
+            if (!$usuario) {
+                if ($esPeticionAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok' => false, 'message' => 'El usuario de prueba no existe en la base de datos.']);
+                    exit;
+                }
+            }
+
+            // Iniciamos sesión
+            session_regenerate_id(true);
+            $_SESSION['usuario'] = [
+                'id_usuario' => $usuario['id_usuario'],
+                'nombre' => $usuario['nombre'],
+                'apellido' => $usuario['apellido'],
+                'correo' => $usuario['correo'],
+                'id_rol' => $usuario['id_rol'],
+                'id_sucursal' => $usuario['id_sucursal'],
+                'rol' => $usuario['rol'] ?? $rolDemo,
+            ];
+
+            // Determinamos a qué dashboard va
+            $rolNombre = strtolower(trim($_SESSION['usuario']['rol']));
+            if (strpos($rolNombre, 'admin') !== false) {
+                $destino = 'src/php/modulos/home/dashboard.php';
+            } elseif (strpos($rolNombre, 'gerente') !== false) {
+                $destino = 'src/php/modulos/home/dashboard_gerente.php';
+            } else {
+                $destino = 'src/php/componentes/catalogo.php';
+            }
+
+            if ($esPeticionAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => true, 'redirect' => $destino]);
+                exit;
+            }
+            header('Location: ' . $destino);
+            exit;
+
+        } catch (PDOException $e) {
+            if ($esPeticionAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'message' => 'Error de BD al procesar rol de prueba.']);
+                exit;
+            }
+        }
+    }
+
+    // =========================================================================
+    // 3. LÓGICA DE INICIO DE SESIÓN NORMAL (FORMULARIO)
+    // =========================================================================
     $correo = trim($_POST['correo'] ?? '');
     $contrasena = $_POST['contrasena'] ?? '';
 
     if ($pdo === null) {
         $loginError = $errorConexion ?? 'No fue posible conectar con la base de datos.';
-    } elseif (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+    } elseif (!filter_var($correo, FILTER_VALIDATE_EMAIL) && !isset($_POST['demo_login'])) {
         $loginError = 'Escribe un correo electrónico válido.';
-    } elseif ($contrasena === '') {
+    } elseif ($contrasena === '' && !isset($_POST['demo_login'])) {
         $loginError = 'Escribe tu contraseña.';
-    } else {
+    } elseif (!isset($_POST['demo_login'])) {
         $consulta = $pdo->prepare('SELECT u.id_usuario, u.nombre, u.apellido, u.correo, u.password_hash, u.id_rol, u.id_sucursal, u.estado, r.nombre AS rol FROM usuarios u INNER JOIN roles r ON r.id_rol = u.id_rol WHERE u.correo = ? LIMIT 1');
         $consulta->execute([$correo]);
         $usuario = $consulta->fetch();
@@ -50,7 +122,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'id_sucursal' => $usuario['id_sucursal'],
                 'rol' => $usuario['rol'],
             ];
-            $destino = 'src/php/modulos/home/home.php';
+            
+            // Redirección inteligente tras login normal
+            $rolNombre = strtolower(trim($usuario['rol']));
+            if (strpos($rolNombre, 'admin') !== false) {
+                $destino = 'src/php/modulos/home/dashboard.php';
+            } elseif (strpos($rolNombre, 'gerente') !== false) {
+                $destino = 'src/php/modulos/home/dashboard_gerente.php';
+            } else {
+                $destino = 'src/php/componentes/catalogo.php';
+            }
+
             if ($esPeticionAjax) {
                 header('Content-Type: application/json; charset=utf-8');
                 echo json_encode(['ok' => true, 'redirect' => $destino]);
@@ -128,7 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .role-picker h3 { margin: 0 0 6px; color: var(--gold); font-size: 19px; text-align: center; }
         .role-picker p { margin: 0 0 18px; color: var(--muted); font-size: 12px; text-align: center; }
         .role-options { display: grid; gap: 8px; }
-        .role-option { display: block; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 6px; background: rgba(255, 255, 255, .07); color: var(--text); font-size: 13px; text-align: center; text-decoration: none; transition: background .2s, border-color .2s; }
+        .role-option { display: block; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 6px; background: rgba(255, 255, 255, .07); color: var(--text); font-size: 13px; text-align: center; text-decoration: none; transition: background .2s, border-color .2s; cursor: pointer;}
         .role-option:hover { border-color: var(--gold); background: rgba(201, 164, 68, .18); }
         .role-picker-close { position: absolute; top: 8px; right: 10px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 22px; }
         .login-input.invalid { border-color: rgba(239, 170, 165, .95); box-shadow: 0 0 0 2px rgba(239, 170, 165, .18); }
@@ -190,10 +272,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <h3 id="rolePickerTitle">Seleccionar rol</h3>
             <p>Acceso rápido para la exposición de avances.</p>
             <div class="role-options">
-                <a class="role-option" href="src/php/modulos/home/dashboard.php">Administrador General</a>
-                <a class="role-option" href="src/php/modulos/home/dashboard.php">Gerente</a>
-                <a class="role-option" href="src/php/modulos/home/dashboard.php">Cajero</a>
-                <a class="role-option" href="src/php/componentes/catalogo.php">Usuario</a>
+                <a href="#" class="role-option btn-rol-demo" data-rol="admin">Administrador General</a>
+                <a href="#" class="role-option btn-rol-demo" data-rol="gerente">Gerente</a>
+                <a href="#" class="role-option btn-rol-demo" data-rol="usuario">Usuario</a>
             </div>
         </div>
     </div>
@@ -245,6 +326,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             google.accounts.id.renderButton(document.getElementById('googleLoginButton'), { theme: 'filled_black', size: 'medium', width: 240, text: 'signin_with', shape: 'rectangular', logo_alignment: 'center' });
         };
 
+        // Lógica AJAX para el inicio de sesión normal
         loginForm.addEventListener('submit', (evento) => {
             evento.preventDefault();
             const errors = [];
@@ -277,6 +359,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 .catch(() => showLoginMessage(['No fue posible conectar con el servidor.'], ['correo', 'contrasena']));
         });
 
+        // Lógica AJAX para los botones de acceso rápido a roles
+        document.querySelectorAll('.btn-rol-demo').forEach((btn) => {
+            btn.addEventListener('click', (evento) => {
+                evento.preventDefault();
+                const rolDemo = btn.dataset.rol;
+                
+                const formData = new URLSearchParams();
+                formData.append('rol_demo', rolDemo);
+                formData.append('demo_login', '1');
+
+                fetch(window.location.href, {
+                    method: 'POST',
+                    headers: { 
+                        'X-Requested-With': 'XMLHttpRequest', 
+                        'Content-Type': 'application/x-www-form-urlencoded' 
+                    },
+                    body: formData.toString()
+                })
+                .then(respuesta => respuesta.json())
+                .then(resultado => {
+                    if (resultado.ok) {
+                        window.location.href = resultado.redirect;
+                    } else {
+                        alert(resultado.message || 'Error al procesar el rol de prueba.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error de conexión con el servidor.');
+                });
+            });
+        });
+
         [correoInput, contrasenaInput].forEach((campo) => {
             campo.addEventListener('input', () => {
                 campo.classList.remove('invalid');
@@ -294,3 +409,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </body>
+</html>
