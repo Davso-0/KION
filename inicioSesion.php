@@ -1,162 +1,199 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+declare(strict_types=1);
 
-header("Cache-Control: no-cache, no-store, must-revalidate");
-header("Pragma: no-cache");
-header("Expires: 0");
+session_start();
+define('DEV_MODE', true);
+$_SESSION['csrf_token'] = $_SESSION['csrf_token'] ?? bin2hex(random_bytes(32));
 
-// 1. Redirección inteligente si ya hay sesión iniciada
-if (isset($_SESSION['usuario'])) {
-    $rolNombre = strtolower(trim($_SESSION['usuario']['rol'] ?? ''));
-    if (strpos($rolNombre, 'admin') !== false) {
-        $destino = 'src/php/modulos/home/dashboard.php';
-    } elseif (strpos($rolNombre, 'gerente') !== false) {
-        $destino = 'src/php/modulos/home/dashboard_gerente.php';
-    } else {
-        $destino = 'src/php/componentes/catalogo.php';
-    }
-    header('Location: ' . $destino);
+function responderInicioSesion(bool $ok, string $message, ?string $redirect = null): never
+{
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(
+        ['ok' => $ok, 'message' => $message, 'redirect' => $redirect],
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+    );
     exit;
 }
 
-$loginError = $_SESSION['login_error'] ?? '';
-unset($_SESSION['login_error']);
-$esPeticionAjax = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
+function obtenerDestinoUsuario(array $usuario): string
+{
+    $_SESSION['usuario'] = [
+        'id_usuario' => $usuario['id_usuario'],
+        'nombre' => $usuario['nombre'],
+        'apellido' => $usuario['apellido'],
+        'correo' => $usuario['correo'],
+        'id_rol' => $usuario['id_rol'],
+        'id_sucursal' => $usuario['id_sucursal'],
+        'rol' => $usuario['rol'],
+    ];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    require_once __DIR__ . '/src/php/config/conexion_BD.php';
+    return $usuario['rol'] === 'Usuario'
+        ? 'src/php/componentes/catalogo.php'
+        : 'src/php/modulos/home/dashboard.php';
+}
 
-   // =========================================================================
-    // 2. LÓGICA DE ACCESO RÁPIDO (BOTONES DE ROL DEMO) - MAPEO DE CUENTAS
-    // =========================================================================
-    if (isset($_POST['demo_login']) && isset($_POST['rol_demo'])) {
-        $rolDemo = $_POST['rol_demo'];
+function cookieSegura(): bool
+{
+    return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+}
 
-        // Correos exactos extraídos de tu base de datos
-        $correosPorRol = [
-            'admin'   => 'admin_demo@kion.com',
-            'gerente' => 'GerenteManzanillo@gmail.com',
-            'usuario' => 'usuario_demo@kion.com'
-        ];
+function borrarCookieRecordarme(): void
+{
+    setcookie('kion_remember', '', [
+        'expires' => time() - 3600,
+        'path' => '/',
+        'secure' => cookieSegura(),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+}
 
-        $correoDemo = $correosPorRol[$rolDemo] ?? ($rolDemo . "_demo@kion.com");
+$esAjax = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
+$metodoPost = $_SERVER['REQUEST_METHOD'] === 'POST';
+$accion = $_POST['action'] ?? '';
+$accion = is_string($accion) ? $accion : '';
+
+require_once __DIR__ . '/src/php/config/conexion_BD.php';
+if ($pdo === null && ($metodoPost || (!isset($_SESSION['usuario']) && isset($_COOKIE['kion_remember'])))) {
+    if ($metodoPost) {
+        responderInicioSesion(false, $errorConexion ?? 'No fue posible conectar con la base de datos.');
+    }
+    borrarCookieRecordarme();
+}
+
+if (!$metodoPost && !isset($_SESSION['usuario']) && isset($_COOKIE['kion_remember']) && $pdo !== null) {
+    $tokenRecordarme = $_COOKIE['kion_remember'];
+    if (is_string($tokenRecordarme) && preg_match('/^[a-f0-9]{64}$/', $tokenRecordarme)) {
+        try {
+            $consultaRecordarme = $pdo->prepare('SELECT u.id_usuario, u.nombre, u.apellido, u.correo, u.id_rol, u.id_sucursal, u.estado, r.nombre AS rol FROM usuarios u INNER JOIN roles r ON r.id_rol = u.id_rol WHERE u.remember_token = ? AND u.remember_expires_at > CURRENT_TIMESTAMP LIMIT 1');
+            $consultaRecordarme->execute([hash('sha256', $tokenRecordarme)]);
+            $usuarioRecordado = $consultaRecordarme->fetch();
+            if ($usuarioRecordado && $usuarioRecordado['estado'] === 'ACTIVO') {
+                session_regenerate_id(true);
+                obtenerDestinoUsuario($usuarioRecordado);
+                header('Location: ' . ($usuarioRecordado['rol'] === 'Usuario'
+                    ? 'src/php/componentes/catalogo.php'
+                    : 'src/php/modulos/home/dashboard.php'));
+                exit;
+            }
+            $limpiarToken = $pdo->prepare('UPDATE usuarios SET remember_token = NULL, remember_expires_at = NULL WHERE remember_token = ?');
+            $limpiarToken->execute([hash('sha256', $tokenRecordarme)]);
+            borrarCookieRecordarme();
+        } catch (PDOException $e) {
+            error_log('KION recordar sesión: ' . $e->getMessage());
+            borrarCookieRecordarme();
+        }
+    } else {
+        borrarCookieRecordarme();
+    }
+}
+
+if ($metodoPost) {
+    $csrfToken = $_POST['csrf_token'] ?? '';
+    if (!is_string($csrfToken) || !hash_equals($_SESSION['csrf_token'], $csrfToken)) {
+        responderInicioSesion(false, 'La solicitud expiró o no es válida. Recarga la página e inténtalo de nuevo.');
+    }
+
+    if ($pdo === null) {
+        responderInicioSesion(false, $errorConexion ?? 'No fue posible conectar con la base de datos.');
+    }
+
+    if ($accion === 'recuperar') {
+        $correoRecuperacion = $_POST['correo_recuperacion'] ?? '';
+        $correoRecuperacion = is_string($correoRecuperacion) ? trim($correoRecuperacion) : '';
+        if (!filter_var($correoRecuperacion, FILTER_VALIDATE_EMAIL)) {
+            responderInicioSesion(false, 'Escribe un correo electrónico válido.', null);
+        }
 
         try {
-            $consulta = $pdo->prepare('SELECT u.id_usuario, u.nombre, u.apellido, u.correo, u.password_hash, u.id_rol, u.id_sucursal, u.estado, r.nombre AS rol FROM usuarios u LEFT JOIN roles r ON r.id_rol = u.id_rol WHERE u.correo = ? LIMIT 1');
-            $consulta->execute([$correoDemo]);
-            $usuario = $consulta->fetch();
-
-            if (!$usuario) {
-                if ($esPeticionAjax) {
-                    header('Content-Type: application/json; charset=utf-8');
-                    echo json_encode(['ok' => false, 'message' => "El usuario ($correoDemo) no existe en la base de datos."]);
-                    exit;
-                }
+            $consultaRecuperacion = $pdo->prepare('SELECT id_usuario FROM usuarios WHERE correo = ? AND estado = \'ACTIVO\' LIMIT 1');
+            $consultaRecuperacion->execute([$correoRecuperacion]);
+            $idUsuarioRecuperacion = $consultaRecuperacion->fetchColumn();
+            if ($idUsuarioRecuperacion) {
+                $tokenRecuperacion = bin2hex(random_bytes(32));
+                $guardarRecuperacion = $pdo->prepare('UPDATE usuarios SET recovery_token = ?, recovery_expires_at = ? WHERE id_usuario = ?');
+                $guardarRecuperacion->execute([
+                    hash('sha256', $tokenRecuperacion),
+                    date('Y-m-d H:i:s', time() + 3600),
+                    $idUsuarioRecuperacion,
+                ]);
             }
-
-            session_regenerate_id(true);
-            $_SESSION['usuario'] = [
-                'id_usuario'  => $usuario['id_usuario'],
-                'nombre'      => $usuario['nombre'],
-                'apellido'    => $usuario['apellido'],
-                'correo'      => $usuario['correo'],
-                'id_rol'      => $usuario['id_rol'],
-                'id_sucursal' => $usuario['id_sucursal'],
-                'rol'         => $usuario['rol'] ?? $rolDemo,
-            ];
-
-            $rolNombre = strtolower(trim($_SESSION['usuario']['rol']));
-            if (strpos($rolNombre, 'admin') !== false) {
-                $destino = 'src/php/modulos/home/dashboard.php';
-            } elseif (strpos($rolNombre, 'gerente') !== false) {
-                $destino = 'src/php/modulos/home/dashboard_gerente.php';
-            } else {
-                $destino = 'src/php/componentes/catalogo.php';
-            }
-
-            if ($esPeticionAjax) {
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['ok' => true, 'redirect' => $destino]);
-                exit;
-            }
-            header('Location: ' . $destino);
-            exit;
-
+            responderInicioSesion(true, 'Se han enviado las instrucciones de recuperación a tu correo electrónico.');
         } catch (PDOException $e) {
-            if ($esPeticionAjax) {
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['ok' => false, 'message' => 'Error de BD al procesar rol de prueba.']);
-                exit;
-            }
+            error_log('KION recuperación de contraseña: ' . $e->getMessage());
+            responderInicioSesion(false, 'No fue posible procesar la solicitud. Inténtalo de nuevo.');
         }
     }
 
-    // =========================================================================
-    // 3. LÓGICA DE INICIO DE SESIÓN NORMAL (FORMULARIO)
-    // =========================================================================
-    $correo = trim($_POST['correo'] ?? '');
-    $contrasena = $_POST['contrasena'] ?? '';
+    $ahora = time();
+    if (isset($_SESSION['bloqueo_hasta']) && $_SESSION['bloqueo_hasta'] > $ahora) {
+        responderInicioSesion(false, 'Demasiados intentos fallidos. Inténtalo en 15 minutos.');
+    }
+    if (isset($_SESSION['bloqueo_hasta']) && $_SESSION['bloqueo_hasta'] <= $ahora) {
+        unset($_SESSION['bloqueo_hasta'], $_SESSION['intentos_login']);
+    }
 
-    if ($pdo === null) {
-        $loginError = $errorConexion ?? 'No fue posible conectar con la base de datos.';
-    } elseif (!filter_var($correo, FILTER_VALIDATE_EMAIL) && !isset($_POST['demo_login'])) {
-        $loginError = 'Escribe un correo electrónico válido.';
-    } elseif ($contrasena === '' && !isset($_POST['demo_login'])) {
-        $loginError = 'Escribe tu contraseña.';
-    } elseif (!isset($_POST['demo_login'])) {
+    $correo = $_POST['correo'] ?? '';
+    $correo = is_string($correo) ? trim($correo) : '';
+    $contrasena = $_POST['contrasena'] ?? '';
+    $contrasena = is_string($contrasena) ? $contrasena : '';
+    if (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+        responderInicioSesion(false, 'Escribe un correo electrónico válido.');
+    }
+    if ($contrasena === '') {
+        responderInicioSesion(false, 'Escribe tu contraseña.');
+    }
+
+    try {
         $consulta = $pdo->prepare('SELECT u.id_usuario, u.nombre, u.apellido, u.correo, u.password_hash, u.id_rol, u.id_sucursal, u.estado, r.nombre AS rol FROM usuarios u INNER JOIN roles r ON r.id_rol = u.id_rol WHERE u.correo = ? LIMIT 1');
         $consulta->execute([$correo]);
         $usuario = $consulta->fetch();
 
-        if (!$usuario) {
-            $loginError = 'La contraseña o correo electrónico no son correctos.';
-        } elseif ($usuario['estado'] !== 'ACTIVO') {
-            $loginError = 'Esta cuenta se encuentra inactiva.';
-        } elseif (!password_verify($contrasena, $usuario['password_hash'])) {
-            $loginError = 'La contraseña o correo electrónico no son correctos.';
+        if (!$usuario || !password_verify($contrasena, $usuario['password_hash'])) {
+            $_SESSION['intentos_login'] = ($_SESSION['intentos_login'] ?? 0) + 1;
+            if ($_SESSION['intentos_login'] > 5) {
+                $_SESSION['bloqueo_hasta'] = $ahora + (15 * 60);
+                responderInicioSesion(false, 'Demasiados intentos fallidos. Inténtalo en 15 minutos.');
+            }
+            responderInicioSesion(false, 'La contraseña o correo electrónico no son correctos.');
+        }
+        if ($usuario['estado'] !== 'ACTIVO') {
+            responderInicioSesion(false, 'Esta cuenta se encuentra inactiva.');
+        }
+
+        unset($_SESSION['intentos_login'], $_SESSION['bloqueo_hasta']);
+        $recordarme = isset($_POST['recordarme']) && $_POST['recordarme'] === '1';
+        if ($recordarme) {
+            $tokenRecordarme = bin2hex(random_bytes(32));
+            $expiracionRecordarme = time() + (86400 * 30);
+            $guardarRecordarme = $pdo->prepare('UPDATE usuarios SET remember_token = ?, remember_expires_at = ? WHERE id_usuario = ?');
+            $guardarRecordarme->execute([
+                hash('sha256', $tokenRecordarme),
+                date('Y-m-d H:i:s', $expiracionRecordarme),
+                $usuario['id_usuario'],
+            ]);
+            setcookie('kion_remember', $tokenRecordarme, [
+                'expires' => $expiracionRecordarme,
+                'path' => '/',
+                'secure' => cookieSegura(),
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
         } else {
-            session_regenerate_id(true);
-            $_SESSION['usuario'] = [
-                'id_usuario' => $usuario['id_usuario'],
-                'nombre' => $usuario['nombre'],
-                'apellido' => $usuario['apellido'],
-                'correo' => $usuario['correo'],
-                'id_rol' => $usuario['id_rol'],
-                'id_sucursal' => $usuario['id_sucursal'],
-                'rol' => $usuario['rol'],
-            ];
-            
-            // Redirección inteligente tras login normal
-            $rolNombre = strtolower(trim($usuario['rol']));
-            if (strpos($rolNombre, 'admin') !== false) {
-                $destino = 'src/php/modulos/home/dashboard.php';
-            } elseif (strpos($rolNombre, 'gerente') !== false) {
-                $destino = 'src/php/modulos/home/dashboard_gerente.php';
-            } else {
-                $destino = 'src/php/componentes/catalogo.php';
+            $revocarRecordarme = $pdo->prepare('UPDATE usuarios SET remember_token = NULL, remember_expires_at = NULL WHERE id_usuario = ?');
+            $revocarRecordarme->execute([$usuario['id_usuario']]);
+            if (isset($_COOKIE['kion_remember'])) {
+                borrarCookieRecordarme();
             }
-
-            if ($esPeticionAjax) {
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['ok' => true, 'redirect' => $destino]);
-                exit;
-            }
-            header('Location: ' . $destino);
-            exit;
         }
-    }
 
-    if ($loginError !== '') {
-        if ($esPeticionAjax) {
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['ok' => false, 'message' => $loginError]);
-            exit;
-        }
-        $_SESSION['login_error'] = $loginError;
-        header('Location: inicioSesion.php');
-        exit;
+        session_regenerate_id(true);
+        $destino = obtenerDestinoUsuario($usuario);
+        responderInicioSesion(true, 'Inicio de sesión correcto.', $destino);
+    } catch (PDOException $e) {
+        error_log('KION inicio de sesión: ' . $e->getMessage());
+        responderInicioSesion(false, 'No fue posible completar el inicio de sesión. Inténtalo de nuevo.');
     }
 }
 ?>
@@ -165,69 +202,132 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KION - Iniciar Sesion</title>
+    <title>KION | Iniciar sesión</title>
     <style>
         :root {
             --gold: #c9a444;
-            --gold-hover: #e0b84c;
-            --panel: rgba(18, 18, 18, .88);
-            --field: rgba(255, 255, 255, .08);
-            --line: rgba(255, 255, 255, .18);
-            --text: #f5f5f5;
-            --muted: #b6b6b6;
+            --gold-light: #e6c260;
+            --bg-card: rgba(12, 12, 12, 0.65);
+            --field-bg: rgba(255, 255, 255, 0.05);
+            --field-border: rgba(255, 255, 255, 0.15);
+            --text-main: #fff;
+            --text-muted: #a0a0a0;
+            --error-red: #efaaa5;
+            --error-bg: rgba(239, 170, 165, 0.12);
+            --success-green: #8bd19a;
+            --success-bg: rgba(139, 209, 154, 0.12);
         }
-
         * { box-sizing: border-box; }
-        html, body { width: 100%; height: 100%; margin: 0; }
-        body { overflow: hidden; background: #000; color: var(--text); font-family: Arial, sans-serif; }
-        body { animation: pageEnter .55s ease both; }
-        body.page-exit { animation: pageExit .36s ease both; }
-        @keyframes pageEnter {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+        body {
+            display: grid;
+            height: 100vh;
+            height: 100svh;
+            place-items: center;
+            overflow: hidden;
+            padding: 12px 16px;
+            background: #000;
+            color: var(--text-main);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            animation: pageEnter .4s ease backwards;
         }
-        @keyframes pageExit {
-            from { opacity: 1; transform: translateY(0); }
-            to { opacity: 0; transform: translateY(-8px); }
+        body.page-exit { animation: pageExit .28s ease both; }
+        #videoFondo, .velo { position: fixed; inset: 0; width: 100%; height: 100%; }
+        #videoFondo { z-index: -2; object-fit: cover; }
+        .velo { z-index: -1; background: rgba(0, 0, 0, .65); }
+        .auth-card {
+            width: min(420px, 100%);
+            max-height: calc(100svh - 24px);
+            padding: 24px 28px;
+            border: 1px solid rgba(201, 164, 68, .25);
+            border-radius: 16px;
+            background: var(--bg-card);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, .6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
         }
-        #videoFondo { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
-        .velo { position: fixed; inset: 0; background: rgba(0, 0, 0, .28); z-index: -1; }
-        .login-panel { position: fixed; top: 0; right: 0; display: flex; width: min(430px, 100%); height: 100%; align-items: center; padding: 48px; background: linear-gradient(90deg, rgba(18, 18, 18, 0) 0%, rgba(18, 18, 18, .04) 18%, rgba(18, 18, 18, .18) 36%, rgba(18, 18, 18, .5) 58%, rgba(18, 18, 18, .78) 78%, rgba(18, 18, 18, .88) 100%); }
-        .login-content { width: 100%; }
-        .brand { margin-bottom: 42px; text-align: center; }
-        .brand-name { margin: 0 0 8px; font-size: 31px; letter-spacing: 4px; }
-        .brand-subtitle { color: var(--muted); font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; }
-        .form-title { margin: 0 0 26px; color: var(--gold); font-size: 22px; text-align: center; }
-        .form-group { margin-bottom: 18px; }
-        label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 13px; }
-        input { width: 100%; padding: 13px 14px; border: 1px solid var(--line); border-radius: 6px; outline: none; background: var(--field); color: var(--text); font-size: 15px; }
-        input:focus { border-color: var(--gold); }
-        .btn-submit { width: 100%; margin-top: 8px; padding: 13px; border: 0; border-radius: 6px; background: var(--gold); color: #17130a; cursor: pointer; font-size: 15px; font-weight: 700; }
-        .btn-submit:hover { background: var(--gold-hover); }
-        .form-footer { margin-top: 24px; color: var(--muted); font-size: 13px; text-align: center; }
-        .form-footer a { color: var(--gold); font-weight: 700; text-decoration: none; }
-        .form-footer a:hover { text-decoration: underline; }
-        .role-demo-link { display: block; margin-top: 12px; color: rgba(255, 255, 255, .58); font-size: 12px; text-align: center; text-decoration: none; }
-        .role-demo-link:hover { color: var(--gold); text-decoration: underline; }
-        .role-overlay { display: none; position: fixed; inset: 0; z-index: 20; align-items: center; justify-content: center; padding: 20px; background: rgba(0, 0, 0, .58); backdrop-filter: blur(5px); }
-        .role-overlay.visible { display: flex; animation: pageEnter .25s ease both; }
-        .role-picker { position: relative; width: min(330px, calc(100% - 40px)); padding: 24px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 14px; background: rgba(28, 28, 28, .94); box-shadow: 0 22px 55px rgba(0, 0, 0, .45); }
-        .role-picker h3 { margin: 0 0 6px; color: var(--gold); font-size: 19px; text-align: center; }
-        .role-picker p { margin: 0 0 18px; color: var(--muted); font-size: 12px; text-align: center; }
-        .role-options { display: grid; gap: 8px; }
-        .role-option { display: block; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 6px; background: rgba(255, 255, 255, .07); color: var(--text); font-size: 13px; text-align: center; text-decoration: none; transition: background .2s, border-color .2s; cursor: pointer;}
-        .role-option:hover { border-color: var(--gold); background: rgba(201, 164, 68, .18); }
-        .role-picker-close { position: absolute; top: 8px; right: 10px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 22px; }
-        .login-input.invalid { border-color: rgba(239, 170, 165, .95); box-shadow: 0 0 0 2px rgba(239, 170, 165, .18); }
-        .login-inline-message { display: none; margin: 12px 0 0; color: #efaaa5; font-size: 12px; text-align: center; }
-        .login-inline-message.visible { display: block; animation: pageEnter .25s ease both; }
-        .login-divider { display: flex; align-items: center; gap: 10px; margin: 15px 0 9px; color: rgba(255, 255, 255, .42); font-size: 10px; letter-spacing: .5px; text-transform: uppercase; }
-        .login-divider::before, .login-divider::after { content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, .18); }
-        .google-login { display: flex; justify-content: center; width: 100%; min-height: 34px; opacity: .82; filter: saturate(.82); }
-        @media (max-width: 640px) {
-            .login-panel { width: 100%; max-width: 430px; padding: 32px 24px; background: linear-gradient(90deg, rgba(18, 18, 18, .3) 0%, rgba(18, 18, 18, .58) 30%, rgba(18, 18, 18, .86) 70%, rgba(18, 18, 18, .94) 100%); }
-            .brand { margin-bottom: 28px; }
+        .brand-header { margin-bottom: 17px; text-align: center; }
+        .brand-logo { margin: 0 0 2px; color: #fff; font-size: 26px; font-weight: 800; letter-spacing: 3px; }
+        .brand-subtitle { color: var(--text-muted); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; }
+        .form-title { margin: 0 0 14px; color: var(--gold-light); font-size: 18px; text-align: center; }
+        .form-group { margin-bottom: 10px; }
+        label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 12px; }
+        input[type="email"], input[type="password"], input[type="text"] {
+            width: 100%;
+            padding: 10px 13px;
+            border: 1px solid var(--field-border);
+            border-radius: 8px;
+            outline: none;
+            background: var(--field-bg);
+            color: var(--text-main);
+            font: inherit;
+            font-size: 14px;
         }
+        input:focus { border-color: var(--gold-light); box-shadow: 0 0 0 2px rgba(201, 164, 68, .22); }
+        input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus {
+            -webkit-text-fill-color: var(--text-main);
+            box-shadow: 0 0 0 1000px #191815 inset;
+            transition: background-color 9999s ease-out;
+        }
+        .input-wrapper { position: relative; }
+        .input-wrapper input { padding-right: 46px; }
+        .toggle-password { position: absolute; top: 50%; right: 7px; display: grid; width: 34px; height: 34px; padding: 0; transform: translateY(-50%); place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); cursor: pointer; }
+        .toggle-password:hover { color: var(--gold-light); }
+        .toggle-password svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+        .forgot-link { display: block; margin: 0 0 10px; color: var(--gold-light); font-size: 12px; text-align: right; text-decoration: none; }
+        .forgot-link:hover, .form-footer a:hover { color: #f2d77f; text-decoration: underline; }
+        .check-row { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; color: var(--text-muted); font-size: 12px; }
+        .check-row input { width: 15px; height: 15px; margin: 0; accent-color: var(--gold); }
+        .check-row label { margin: 0; color: inherit; font-size: inherit; }
+        .btn-submit, .google-login { display: flex; width: 100%; min-height: 40px; align-items: center; justify-content: center; border-radius: 8px; }
+        .btn-submit { border: 0; background: linear-gradient(135deg, #e6c260 0%, #c9a444 100%); color: #17130a; cursor: pointer; font: inherit; font-size: 14px; font-weight: 750; transition: box-shadow .2s, transform .2s; }
+        .btn-submit:hover { box-shadow: 0 4px 15px rgba(201, 164, 68, .35); transform: translateY(-1px); }
+        .btn-submit:disabled { cursor: wait; opacity: .7; transform: none; }
+        .login-divider { display: flex; align-items: center; gap: 10px; margin: 12px 0 8px; color: var(--text-muted); font-size: 10px; }
+        .login-divider::before, .login-divider::after { height: 1px; flex: 1; background: var(--field-border); content: ''; }
+        .google-login { min-height: 36px; }
+        .form-footer { margin-top: 12px; color: var(--text-muted); font-size: 12px; text-align: center; }
+        .form-footer a { color: var(--gold-light); font-weight: 700; text-decoration: none; }
+        .notice { display: none; margin: 0 0 10px; padding: 9px 11px; border: 1px solid transparent; border-radius: 8px; font-size: 12px; line-height: 1.4; }
+        .notice.visible { display: block; animation: fadeIn .2s ease both; }
+        .notice.error { border-color: rgba(239, 170, 165, .35); background: var(--error-bg); color: var(--error-red); }
+        .notice.success { border-color: rgba(139, 209, 154, .35); background: var(--success-bg); color: var(--success-green); }
+        .dialog-backdrop { position: fixed; inset: 0; z-index: 5; display: none; place-items: center; padding: 16px; background: rgba(0, 0, 0, .66); backdrop-filter: blur(7px); }
+        .dialog-backdrop.visible { display: grid; animation: fadeIn .18s ease both; }
+        .recovery-dialog { width: min(380px, 100%); padding: 24px; border: 1px solid rgba(201, 164, 68, .3); border-radius: 14px; background: rgba(15, 15, 15, .96); box-shadow: 0 20px 55px rgba(0, 0, 0, .65); }
+        .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+        .dialog-head h2 { margin: 0; color: var(--gold-light); font-size: 17px; }
+        .dialog-close { width: 32px; height: 32px; border: 0; border-radius: 7px; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 22px; }
+        .dialog-copy { margin: 0 0 15px; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+        .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 14px; }
+        .btn-secondary { min-height: 38px; padding: 0 13px; border: 1px solid var(--field-border); border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; font: inherit; font-size: 12px; }
+        .btn-secondary:hover { border-color: var(--gold); color: var(--text-main); }
+        .dialog-submit { min-height: 38px; padding: 0 15px; border: 0; border-radius: 8px; background: linear-gradient(135deg, #e6c260, #c9a444); color: #17130a; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+        <?php if (DEV_MODE === true): ?>
+        .role-demo-link { display: inline-block; margin-top: 8px; color: var(--text-muted) !important; font-size: 10px; font-weight: 400 !important; }
+        .role-overlay { position: fixed; inset: 0; z-index: 6; display: none; place-items: center; padding: 16px; background: rgba(0, 0, 0, .66); backdrop-filter: blur(6px); }
+        .role-overlay.visible { display: grid; }
+        .role-picker { position: relative; width: min(330px, 100%); padding: 22px; border: 1px solid rgba(201, 164, 68, .3); border-radius: 12px; background: #171717; }
+        .role-picker h2 { margin: 0 0 7px; color: var(--gold-light); font-size: 17px; text-align: center; }
+        .role-picker p { margin: 0 0 14px; color: var(--text-muted); font-size: 11px; text-align: center; }
+        .role-options { display: grid; gap: 7px; }
+        .role-option { padding: 9px; border: 1px solid var(--field-border); border-radius: 7px; color: var(--text-main); font-size: 12px; text-align: center; text-decoration: none; }
+        .role-option:hover { border-color: var(--gold); color: var(--gold-light); }
+        .role-picker-close { position: absolute; top: 6px; right: 8px; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 22px; }
+        <?php endif; ?>
+        @keyframes pageEnter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pageExit { to { opacity: 0; transform: translateY(-5px); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-height: 650px) {
+            .auth-card { padding: 17px 24px; }
+            .brand-header { margin-bottom: 10px; }
+            .form-title { margin-bottom: 9px; }
+            .form-group { margin-bottom: 7px; }
+            .login-divider { margin: 8px 0 5px; }
+            .form-footer { margin-top: 7px; }
+        }
+        @media (max-width: 400px) { .auth-card { padding-right: 21px; padding-left: 21px; } }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
     </style>
 </head>
 <body>
@@ -236,182 +336,214 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </video>
     <div class="velo"></div>
 
-    <aside class="login-panel">
-        <div class="login-content">
-            <header class="brand">
-                <h1 class="brand-name">KION</h1>
-                <div class="brand-subtitle">Vet & Agropecuario</div>
-            </header>
-
-            <form id="loginForm" method="post" novalidate>
-                <h2 class="form-title">Iniciar Sesion</h2>
-
-                <div class="form-group">
-                    <label for="correo">Correo electronico</label>
-                    <input class="login-input" type="email" id="correo" name="correo" placeholder="usuario@kion.com" autocomplete="email" required>
+    <main class="auth-card">
+        <header class="brand-header">
+            <h1 class="brand-logo">KION</h1>
+            <div class="brand-subtitle">Vet &amp; Agropecuario</div>
+        </header>
+        <h2 class="form-title">Iniciar sesión</h2>
+        <div class="notice" id="loginNotice" role="status" aria-live="polite"></div>
+        <form id="loginForm" method="post" novalidate>
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+            <div class="form-group">
+                <label for="correo">Correo electrónico</label>
+                <input id="correo" name="correo" type="email" placeholder="usuario@kion.com" autocomplete="email" required>
+            </div>
+            <div class="form-group">
+                <label for="contrasena">Contraseña</label>
+                <div class="input-wrapper">
+                    <input id="contrasena" name="contrasena" type="password" placeholder="Tu contraseña" autocomplete="current-password" required>
+                    <button class="toggle-password" type="button" aria-label="Mostrar contraseña" aria-pressed="false">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
                 </div>
+            </div>
+            <a class="forgot-link" href="#recuperar-contrasena" id="forgotPassword">¿Olvidaste tu contraseña?</a>
+            <div class="check-row">
+                <input id="recordarme" name="recordarme" type="checkbox" value="1">
+                <label for="recordarme">Recordarme</label>
+            </div>
+            <button class="btn-submit" type="submit">Iniciar sesión</button>
+        </form>
+        <div class="login-divider"><span>o continúa con</span></div>
+        <div class="google-login" id="googleLoginButton" aria-label="Continuar con Google"></div>
+        <div class="form-footer">
+            ¿No tienes cuenta? <a href="registro.php">Regístrate</a>
+            <?php if (DEV_MODE === true): ?>
+                <br><a class="role-demo-link" href="#seleccionar-rol" id="openRolePicker">Seleccionar rol (demostración)</a>
+            <?php endif; ?>
+        </div>
+    </main>
 
+    <div class="dialog-backdrop" id="recoveryBackdrop">
+        <section class="recovery-dialog" role="dialog" aria-modal="true" aria-labelledby="recoveryTitle">
+            <div class="dialog-head">
+                <h2 id="recoveryTitle">Recuperar contraseña</h2>
+                <button class="dialog-close" id="closeRecovery" type="button" aria-label="Cerrar">&times;</button>
+            </div>
+            <p class="dialog-copy">Escribe el correo asociado a tu cuenta y te indicaremos cómo continuar.</p>
+            <div class="notice" id="recoveryNotice" role="status" aria-live="polite"></div>
+            <form id="recoveryForm" novalidate>
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="action" value="recuperar">
                 <div class="form-group">
-                    <label for="contrasena">Contrasena</label>
-                    <input class="login-input" type="password" id="contrasena" name="contrasena" placeholder="Tu contrasena" autocomplete="current-password" required>
+                    <label for="correoRecuperacion">Correo electrónico</label>
+                    <input id="correoRecuperacion" name="correo_recuperacion" type="email" placeholder="usuario@kion.com" autocomplete="email" required>
                 </div>
-
-                <button class="btn-submit" type="submit">Iniciar Sesion</button>
+                <div class="dialog-actions">
+                    <button class="btn-secondary" id="cancelRecovery" type="button">Cancelar</button>
+                    <button class="dialog-submit" type="submit">Enviar instrucciones</button>
+                </div>
             </form>
-
-            <small class="login-inline-message" id="loginInlineMessage" role="alert" aria-live="assertive"></small>
-
-            <div class="login-divider"><span>o continúa con</span></div>
-            <div class="google-login" id="googleLoginButton"></div>
-
-            <div class="form-footer">
-                ¿No tienes cuenta? <a href="registro.php">Registrate</a>
-                <a class="role-demo-link" href="#seleccionar-rol" id="openRolePicker">Seleccionar rol</a>
-            </div>
-        </div>
-    </aside>
-
-    <div class="role-overlay" id="roleOverlay">
-        <div class="role-picker" role="dialog" aria-modal="true" aria-labelledby="rolePickerTitle">
-            <button class="role-picker-close" id="closeRolePicker" type="button" aria-label="Cerrar">&times;</button>
-            <h3 id="rolePickerTitle">Seleccionar rol</h3>
-            <p>Acceso rápido para la exposición de avances.</p>
-            <div class="role-options">
-                <a href="#" class="role-option btn-rol-demo" data-rol="admin">Administrador General</a>
-                <a href="#" class="role-option btn-rol-demo" data-rol="gerente">Gerente</a>
-                <a href="#" class="role-option btn-rol-demo" data-rol="usuario">Usuario</a>
-            </div>
-        </div>
+        </section>
     </div>
 
+    <?php if (DEV_MODE === true): ?>
+        <div class="role-overlay" id="roleOverlay">
+            <section class="role-picker" role="dialog" aria-modal="true" aria-labelledby="rolePickerTitle">
+                <button class="role-picker-close" id="closeRolePicker" type="button" aria-label="Cerrar">&times;</button>
+                <h2 id="rolePickerTitle">Seleccionar rol</h2>
+                <p>Acceso rápido para la exposición de avances.</p>
+                <nav class="role-options" aria-label="Roles de demostración">
+                    <a class="role-option" href="src/php/modulos/home/dashboard.php">Administrador General</a>
+                    <a class="role-option" href="src/php/modulos/home/dashboard.php">Gerente</a>
+                    <a class="role-option" href="src/php/modulos/home/dashboard.php">Cajero</a>
+                    <a class="role-option" href="src/php/componentes/catalogo.php">Usuario</a>
+                </nav>
+            </section>
+        </div>
+    <?php endif; ?>
+
     <script>
-        window.googleClientId = '467947233896-kuvnpl5cdegqkduq4m3e1ste6280feaf.apps.googleusercontent.com';
         const loginForm = document.getElementById('loginForm');
-        const correoInput = document.getElementById('correo');
-        const contrasenaInput = document.getElementById('contrasena');
-        const loginInlineMessage = document.getElementById('loginInlineMessage');
-        const roleOverlay = document.getElementById('roleOverlay');
-        const openRolePicker = document.getElementById('openRolePicker');
-        const closeRolePicker = document.getElementById('closeRolePicker');
+        const loginNotice = document.getElementById('loginNotice');
+        const recoveryForm = document.getElementById('recoveryForm');
+        const recoveryNotice = document.getElementById('recoveryNotice');
+        const recoveryBackdrop = document.getElementById('recoveryBackdrop');
+        const googleClientId = '467947233896-kuvnpl5cdegqkduq4m3e1ste6280feaf.apps.googleusercontent.com';
 
-        openRolePicker.addEventListener('click', (evento) => {
-            evento.preventDefault();
-            roleOverlay.classList.add('visible');
-        });
-
-        closeRolePicker.addEventListener('click', () => roleOverlay.classList.remove('visible'));
-        roleOverlay.addEventListener('click', (evento) => {
-            if (evento.target === roleOverlay) roleOverlay.classList.remove('visible');
-        });
-
-        function showLoginMessage(errors, invalidFields = []) {
-            correoInput.classList.toggle('invalid', invalidFields.includes('correo'));
-            contrasenaInput.classList.toggle('invalid', invalidFields.includes('contrasena'));
-            loginInlineMessage.textContent = errors.join(' ');
-            loginInlineMessage.classList.add('visible');
+        function showNotice(element, message, type) {
+            element.textContent = message;
+            element.className = `notice visible ${type}`;
         }
 
-        function handleGoogleCredential(response) {
-            const datos = new URLSearchParams({ credential: response.credential });
-            fetch('google-callback.php', { method: 'POST', body: datos })
-                .then(respuesta => respuesta.json())
-                .then(resultado => {
-                    if (resultado.ok) {
-                        window.location.href = resultado.redirect;
-                        return;
-                    }
-                    showLoginMessage([resultado.message || 'No fue posible iniciar sesión con Google.'], ['correo', 'contrasena']);
-                })
-                .catch(() => showLoginMessage(['No fue posible conectar con Google.'], ['correo', 'contrasena']));
+        async function sendForm(form, notice, successDelay = 1500) {
+            notice.className = 'notice';
+            const button = form.querySelector('button[type="submit"]');
+            button.disabled = true;
+            try {
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: new FormData(form)
+                });
+                const result = await response.json();
+                if (!result.ok) {
+                    showNotice(notice, result.message || 'No fue posible completar la solicitud.', 'error');
+                    return;
+                }
+                showNotice(notice, result.message || 'Solicitud completada.', 'success');
+                if (result.redirect) window.setTimeout(() => { window.location.href = result.redirect; }, successDelay);
+            } catch (error) {
+                showNotice(notice, 'No fue posible conectar con el servidor. Inténtalo de nuevo.', 'error');
+            } finally {
+                button.disabled = false;
+            }
         }
 
-        window.onload = () => {
-            if (!window.google) return;
-            google.accounts.id.initialize({ client_id: window.googleClientId, callback: handleGoogleCredential });
-            google.accounts.id.renderButton(document.getElementById('googleLoginButton'), { theme: 'filled_black', size: 'medium', width: 240, text: 'signin_with', shape: 'rectangular', logo_alignment: 'center' });
-        };
+        document.querySelectorAll('.toggle-password').forEach((button) => {
+            button.addEventListener('click', () => {
+                const input = button.parentElement.querySelector('input');
+                const show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                button.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+                button.setAttribute('aria-pressed', String(show));
+            });
+        });
 
-        // Lógica AJAX para el inicio de sesión normal
-        loginForm.addEventListener('submit', (evento) => {
-            evento.preventDefault();
-            const errors = [];
-
-            if (!correoInput.value.trim()) errors.push('Escribe tu correo electrónico.');
-            else if (!correoInput.validity.valid) errors.push('Escribe un correo electrónico válido.');
-            if (!contrasenaInput.value) errors.push('Escribe tu contraseña.');
-
-            if (errors.length > 0) {
-                showLoginMessage(errors, [
-                    !correoInput.value.trim() || !correoInput.validity.valid ? 'correo' : '',
-                    !contrasenaInput.value ? 'contrasena' : ''
-                ]);
+        loginForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const email = loginForm.elements.correo.value.trim();
+            const password = loginForm.elements.contrasena.value;
+            if (!email || !loginForm.elements.correo.validity.valid) {
+                showNotice(loginNotice, 'Escribe un correo electrónico válido.', 'error');
                 return;
             }
+            if (!password) {
+                showNotice(loginNotice, 'Escribe tu contraseña.', 'error');
+                return;
+            }
+            sendForm(loginForm, loginNotice);
+        });
 
-            fetch(window.location.href, {
-                method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                body: new FormData(loginForm)
-            })
-                .then(respuesta => respuesta.json())
-                .then(resultado => {
-                    if (resultado.ok) {
-                        window.location.href = resultado.redirect;
+        document.getElementById('forgotPassword').addEventListener('click', (event) => {
+            event.preventDefault();
+            recoveryNotice.className = 'notice';
+            recoveryForm.reset();
+            recoveryBackdrop.classList.add('visible');
+            document.getElementById('correoRecuperacion').focus();
+        });
+        function closeRecoveryDialog() { recoveryBackdrop.classList.remove('visible'); }
+        document.getElementById('closeRecovery').addEventListener('click', closeRecoveryDialog);
+        document.getElementById('cancelRecovery').addEventListener('click', closeRecoveryDialog);
+        recoveryBackdrop.addEventListener('click', (event) => {
+            if (event.target === recoveryBackdrop) closeRecoveryDialog();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeRecoveryDialog();
+        });
+        recoveryForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const emailInput = recoveryForm.elements.correo_recuperacion;
+            if (!emailInput.value.trim() || !emailInput.validity.valid) {
+                showNotice(recoveryNotice, 'Escribe un correo electrónico válido.', 'error');
+                return;
+            }
+            sendForm(recoveryForm, recoveryNotice, 0);
+        });
+
+        function handleGoogleCredential(response) {
+            const body = new URLSearchParams({ credential: response.credential });
+            fetch('google-callback.php', { method: 'POST', body })
+                .then((response) => response.json())
+                .then((result) => {
+                    if (!result.ok) {
+                        showNotice(loginNotice, result.message || 'No fue posible iniciar sesión con Google.', 'error');
                         return;
                     }
-                    showLoginMessage([resultado.message || 'No fue posible iniciar sesión.'], ['correo', 'contrasena']);
+                    showNotice(loginNotice, 'Inicio de sesión correcto.', 'success');
+                    window.setTimeout(() => { window.location.href = result.redirect; }, 1500);
                 })
-                .catch(() => showLoginMessage(['No fue posible conectar con el servidor.'], ['correo', 'contrasena']));
-        });
-
-        // Lógica AJAX para los botones de acceso rápido a roles
-        document.querySelectorAll('.btn-rol-demo').forEach((btn) => {
-            btn.addEventListener('click', (evento) => {
-                evento.preventDefault();
-                const rolDemo = btn.dataset.rol;
-                
-                const formData = new URLSearchParams();
-                formData.append('rol_demo', rolDemo);
-                formData.append('demo_login', '1');
-
-                fetch(window.location.href, {
-                    method: 'POST',
-                    headers: { 
-                        'X-Requested-With': 'XMLHttpRequest', 
-                        'Content-Type': 'application/x-www-form-urlencoded' 
-                    },
-                    body: formData.toString()
-                })
-                .then(respuesta => respuesta.json())
-                .then(resultado => {
-                    if (resultado.ok) {
-                        window.location.href = resultado.redirect;
-                    } else {
-                        alert(resultado.message || 'Error al procesar el rol de prueba.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error de conexión con el servidor.');
-                });
+                .catch(() => showNotice(loginNotice, 'No fue posible conectar con Google.', 'error'));
+        }
+        window.addEventListener('load', () => {
+            if (!window.google?.accounts?.id) return;
+            google.accounts.id.initialize({ client_id: googleClientId, callback: handleGoogleCredential });
+            google.accounts.id.renderButton(document.getElementById('googleLoginButton'), {
+                theme: 'filled_black', size: 'medium', width: 290, text: 'continue_with', shape: 'rectangular', locale: 'es'
             });
         });
 
-        [correoInput, contrasenaInput].forEach((campo) => {
-            campo.addEventListener('input', () => {
-                campo.classList.remove('invalid');
-                if (!correoInput.classList.contains('invalid') && !contrasenaInput.classList.contains('invalid')) loginInlineMessage.classList.remove('visible');
-            });
+        <?php if (DEV_MODE === true): ?>
+        const roleOverlay = document.getElementById('roleOverlay');
+        document.getElementById('openRolePicker').addEventListener('click', (event) => {
+            event.preventDefault();
+            roleOverlay.classList.add('visible');
         });
+        document.getElementById('closeRolePicker').addEventListener('click', () => roleOverlay.classList.remove('visible'));
+        roleOverlay.addEventListener('click', (event) => {
+            if (event.target === roleOverlay) roleOverlay.classList.remove('visible');
+        });
+        <?php endif; ?>
 
-        document.querySelectorAll('a[href="registro.php"]').forEach((enlace) => {
-            enlace.addEventListener('click', (evento) => {
-                evento.preventDefault();
+        document.querySelectorAll('a[href="registro.php"]').forEach((link) => {
+            link.addEventListener('click', (event) => {
+                event.preventDefault();
                 document.body.classList.add('page-exit');
-                setTimeout(() => { window.location.href = enlace.href; }, 360);
+                window.setTimeout(() => { window.location.href = link.href; }, 280);
             });
         });
     </script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://accounts.google.com/gsi/client?hl=es" async defer></script>
 </body>
 </html>

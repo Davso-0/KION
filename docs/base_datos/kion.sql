@@ -158,6 +158,10 @@ CREATE TABLE `usuarios` (
   `password_hash` varchar(255) NOT NULL,
   `id_rol` int(10) UNSIGNED NOT NULL,
   `id_sucursal` int(10) UNSIGNED DEFAULT NULL,
+  `remember_token` char(64) DEFAULT NULL,
+  `remember_expires_at` datetime DEFAULT NULL,
+  `recovery_token` char(64) DEFAULT NULL,
+  `recovery_expires_at` datetime DEFAULT NULL,
   `estado` enum('ACTIVO','INACTIVO') NOT NULL DEFAULT 'ACTIVO'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
