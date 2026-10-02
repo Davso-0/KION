@@ -1329,6 +1329,17 @@ header("Expires: 0");
             border-color: #a87959;
         }
 
+        body.dark-mode .language-btn {
+            background: #30251f;
+            color: #f3d4bc;
+            border-color: #a87959;
+        }
+
+        body.dark-mode .language-btn:hover {
+            background: #8d6045;
+            color: #ffffff;
+        }
+
 
         /* HERO */
 
@@ -2214,36 +2225,138 @@ header("Expires: 0");
      JAVASCRIPT MODO OSCURO E IDIOMA
 ===================================================== -->
 <script>
+    // --- GESTIÓN DE MODO OSCURO (PERSISTENTE) ---
     const darkModeBtn = document.getElementById("darkModeBtn");
-    darkModeBtn.addEventListener("click", function () {
-        document.body.classList.toggle("dark-mode");
-    });
+
+    function applyDarkMode(isDark) {
+        if (isDark) {
+            document.body.classList.add("dark-mode");
+            darkModeBtn.textContent = "☀️";
+        } else {
+            document.body.classList.remove("dark-mode");
+            darkModeBtn.textContent = "🌙";
+        }
+        updateDarkModeTitle();
+    }
+
+    function updateDarkModeTitle() {
+        if (!darkModeBtn) return;
+        const isDark = document.body.classList.contains("dark-mode");
+        darkModeBtn.title = (typeof homeInEnglish !== 'undefined' && homeInEnglish)
+            ? (isDark ? "Switch to light mode" : "Switch to dark mode")
+            : (isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro");
+    }
+
+    if (darkModeBtn) {
+        darkModeBtn.addEventListener("click", function () {
+            const isDark = !document.body.classList.contains("dark-mode");
+            localStorage.setItem("kion_dark", isDark ? "1" : "0");
+            applyDarkMode(isDark);
+        });
+
+        // Aplicar modo oscuro guardado
+        const savedDark = localStorage.getItem("kion_dark");
+        if (savedDark === "1") {
+            applyDarkMode(true);
+        } else {
+            applyDarkMode(false);
+        }
+    }
 </script>
 
 <script>
+    // --- DICCIONARIO COMPLETO ESPAÑOL -> INGLÉS ---
     const homeTranslations = {
-        'Inicio': 'Home', 'Catálogo': 'Catalog', 'Iniciar sesión': 'Sign in',
-        'Perfil': 'Profile', 'Cerrar sesión': 'Sign out', 'SOFTWARE PARA VETERINARIAS': 'SOFTWARE FOR VETERINARY CLINICS',
-        'La administración': 'Managing', 'de tu veterinaria,': 'your veterinary clinic,', 'más fácil.': 'made easier.',
-        'Comenzar ahora': 'Get started', 'Conocer KION': 'Discover KION', 'Panel de KION': 'KION dashboard',
-        'Ventas hoy': 'Today sales', 'Productos': 'Products', 'Sucursales': 'Branches',
-        'Ventas recientes': 'Recent sales', 'Alimentos': 'Food', 'Medicamentos': 'Medicine', 'Accesorios': 'Accessories',
+        // Navbar y Sesión
+        'Inicio': 'Home',
+        'Catálogo': 'Catalog',
+        'Cerrar sesión': 'Sign out',
+        'Iniciar sesión': 'Sign in',
+        'Perfil': 'Profile',
+
+        // Hero principal
+        'SOFTWARE PARA VETERINARIAS': 'SOFTWARE FOR VETERINARY CLINICS',
+        'La administración de tu veterinaria,': 'Managing your veterinary clinic,',
+        'La administración': 'Managing',
+        'de tu veterinaria,': 'your veterinary clinic,',
+        'más fácil.': 'made easier.',
+        'más fácil': 'made easier',
+        'KION es un sistema de punto de venta e inventario diseñado para ayudarte a controlar las ventas, productos, usuarios y sucursales de tu negocio veterinario desde un solo lugar.': 'KION is a point-of-sale and inventory system designed to help you manage sales, products, users, and branches of your veterinary business from one single place.',
+        'Comenzar ahora': 'Get started',
+        'Conocer KION': 'Discover KION',
+
+        // Mockup visual en Hero
+        'Panel de KION': 'KION dashboard',
+        'Ventas hoy': "Today's sales",
+        'Productos': 'Products',
+        'Sucursales': 'Branches',
+        'Ventas recientes': 'Recent sales',
+        'Inventario': 'Inventory',
+        'Alimentos': 'Food',
+        'Medicamentos': 'Medication',
+        'Accesorios': 'Accessories',
+
+        // Sección Intro
+        'Una solución pensada para': 'A solution designed for',
+        'veterinarias que quieren tener el control de su negocio.': 'veterinary clinics that want control of their business.',
+        'veterinarias que quieren tener el control de su negocio': 'veterinary clinics that want control of their business',
+
+        // Funciones Principales
         'TODO EN UN SOLO LUGAR': 'EVERYTHING IN ONE PLACE',
         'Todo lo que tu veterinaria necesita': 'Everything your veterinary clinic needs',
-        'Punto de venta': 'Point of sale', 'Gestión de Inventario': 'Inventory Management',
-        'Multi-Sucursal': 'Multi-Branch', 'Control de Personal': 'Staff Control',
+        'KION reúne las herramientas necesarias para administrar las operaciones de tu negocio de manera sencilla y organizada.': 'KION brings together the tools needed to manage your business operations simply and neatly.',
+        'Punto de venta': 'Point of sale',
+        'Registra las ventas de alimentos, medicamentos, accesorios y productos veterinarios al instante.': 'Record sales of food, medication, accessories, and veterinary products instantly.',
+        'Gestión de Inventario': 'Inventory Management',
+        'Mantén controladas las existencias y alertas de stock de tus productos en cada sucursal.': 'Keep stock levels and stock alerts for your products under control in every branch.',
+        'Multi-Sucursal': 'Multi-Branch',
+        'Administra diferentes sucursales y sedes centralizadamente desde un mismo sistema.': 'Manage different branches and locations centrally from a single system.',
+        'Control de Personal': 'Staff Control',
+        'Gestiona los accesos y funciones de administradores, gerentes y cajeros.': 'Manage access permissions and duties for administrators, managers, and cashiers.',
+
+        // Demostración de Ventas e Inventario
+        'Punto de venta activo': 'Active point of sale',
+        'Alimento para perro (15kg)': 'Dog food (15kg)',
+        'Antibiótico veterinario': 'Veterinary antibiotic',
+        'Collar antipulgas': 'Flea collar',
+        'Total': 'Total',
         'PUNTO DE VENTA E INVENTARIO': 'POINT OF SALE AND INVENTORY',
         'Vende de forma rápida y mantén la información actualizada.': 'Sell quickly and keep information up to date.',
+        'Registra cada operación al instante y consulta existencias en tiempo real sin complicaciones.': 'Record every transaction instantly and check real-time stock without hassle.',
+        'Registro inmediato de ventas e ingresos': 'Instant recording of sales and revenue',
+        'Categorización de alimentos, medicamentos y accesorios': 'Categorization of food, medication, and accessories',
+        'Descuento automático de existencias en inventario': 'Automatic stock reduction in inventory',
+        'Control por sucursal y reporte de operaciones': 'Branch-by-branch control and operations reporting',
+
+        // Sucursales y Roles
         'MULTI-SUCURSAL Y ROLES': 'MULTI-BRANCH AND ROLES',
-        'Una sola plataforma para todas tus sucursales': 'One platform for all your branches',
-        'Gerentes': 'Managers', 'Cajeros': 'Cashiers',
+        'Una sola plataforma para todas tus sucursales': 'One single platform for all your branches',
+        'Centraliza la información y facilita la administración de cada punto de venta.': 'Centralize information and streamline management for every point of sale.',
+        'Administra los productos y existencias de cada sede de forma independiente.': 'Manage products and stock for each location independently.',
+        'Gerentes': 'Managers',
+        'Los responsables de cada sede supervisan las operaciones y stock local.': 'Location managers supervise local operations and stock.',
+        'Cajeros': 'Cashiers',
+        'Realizan los cobros diarios y atienden el punto de venta de forma ágil.': 'Process daily checkouts and handle the cash register quickly.',
+
+        // Pasos
         'SIMPLE Y ORGANIZADO': 'SIMPLE AND ORGANIZED',
         'Comienza a utilizar KION en 3 pasos': 'Start using KION in 3 steps',
-        'Ingresa': 'Log in', 'Administra': 'Manage', 'Vende': 'Sell',
+        'Organiza las operaciones de tu veterinaria sin complicaciones.': 'Organize your veterinary operations without hassle.',
+        'Ingresa': 'Log in',
+        'Inicia sesión en tu cuenta para acceder al sistema.': 'Sign in to your account to access the system.',
+        'Administra': 'Manage',
+        'Controla inventario, existencias y permisos de cada sucursal.': 'Control inventory, stock levels, and permissions for each branch.',
+        'Vende': 'Sell',
+        'Registra ventas y mantén actualizada la información de tu negocio.': 'Record sales and keep your business information up to date.',
+
+        // CTA Final
         'Tu veterinaria necesita control.': 'Your veterinary clinic needs control.',
+        'Ventas, inventario y sucursales en un solo lugar.': 'Sales, inventory, and branches in one place.',
         'Comenzar con KION': 'Get started with KION',
-        'KION es un sistema de punto de venta e inventario diseñado para ayudarte a controlar las ventas, productos, usuarios y sucursales de tu negocio veterinario desde un solo lugar.': 'KION is a point-of-sale and inventory system designed to help you manage sales, products, users, and branches from one place.',
-        '© 2026 KION · Punto de Venta e Inventario para Veterinarias': '© 2026 KION · Point of Sale and Inventory for Veterinary Clinics'
+
+        // Footer
+        '© 2026 KION · Punto de Venta e Inventario para Veterinarias': '© 2026 KION · Point of Sale and Inventory for Veterinary Clinics',
+        'Punto de Venta e Inventario para Veterinarias': 'Point of Sale and Inventory for Veterinary Clinics'
     };
 
     const originalHomeTexts = new Map();
@@ -2251,18 +2364,30 @@ header("Expires: 0");
 
     function toggleHomeLanguage() {
         const entries = Object.entries(homeTranslations).sort((a, b) => b[0].length - a[0].length);
+        const languageBtn = document.getElementById('languageToggle');
+
         document.querySelectorAll('body *:not(script):not(style)').forEach((element) => {
+            // Ignorar los botones de control para no alterar sus iconos o etiquetas técnicas
+            if (element.id === 'darkModeBtn' || element.id === 'languageToggle') return;
+
             element.childNodes.forEach((node) => {
                 if (node.nodeType !== Node.TEXT_NODE || node.parentElement?.hasAttribute('data-i18n')) return;
-                if (!originalHomeTexts.has(node)) originalHomeTexts.set(node, node.textContent);
+                if (node.parentElement?.id === 'darkModeBtn' || node.parentElement?.id === 'languageToggle') return;
+
+                if (!originalHomeTexts.has(node)) {
+                    originalHomeTexts.set(node, node.textContent);
+                }
+
                 const originalText = originalHomeTexts.get(node);
                 const leading = originalText.match(/^\s*/)[0];
                 const trailing = originalText.match(/\s*$/)[0];
                 const normalized = originalText.trim().replace(/\s+/g, ' ');
+
                 if (!homeInEnglish) {
                     node.textContent = originalText;
                     return;
                 }
+
                 let translated = normalized;
                 entries.forEach(([spanish, english]) => {
                     translated = translated.split(spanish).join(english);
@@ -2270,14 +2395,40 @@ header("Expires: 0");
                 node.textContent = `${leading}${translated}${trailing}`;
             });
         });
+
+        // Actualizar atributos de documento y botones
         document.documentElement.lang = homeInEnglish ? 'en' : 'es';
-        document.getElementById('languageToggle').textContent = homeInEnglish ? 'ES' : 'EN';
+        document.title = homeInEnglish ? 'KION | Veterinary Clinic Management' : 'KION | Gestión para Veterinarias';
+
+        if (languageBtn) {
+            languageBtn.textContent = homeInEnglish ? 'ES' : 'EN';
+            languageBtn.title = homeInEnglish ? 'Cambiar a español' : 'Switch to English';
+            languageBtn.setAttribute('aria-label', homeInEnglish ? 'Cambiar a español' : 'Switch to English');
+        }
+
+        if (typeof updateDarkModeTitle === 'function') {
+            updateDarkModeTitle();
+        }
     }
 
-    document.getElementById('languageToggle').addEventListener('click', () => {
-        homeInEnglish = !homeInEnglish;
+    const languageBtn = document.getElementById('languageToggle');
+    if (languageBtn) {
+        languageBtn.addEventListener('click', () => {
+            homeInEnglish = !homeInEnglish;
+            localStorage.setItem('kion_lang', homeInEnglish ? 'en' : 'es');
+            toggleHomeLanguage();
+        });
+    }
+
+    // Inicializar idioma según la preferencia guardada en localStorage
+    const savedLang = localStorage.getItem('kion_lang');
+    if (savedLang === 'en') {
+        homeInEnglish = true;
         toggleHomeLanguage();
-    });
+    } else {
+        homeInEnglish = false;
+        toggleHomeLanguage();
+    }
 </script>
 </body>
 </html>

@@ -28,15 +28,22 @@ $esPeticionAjax = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest'
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_once __DIR__ . '/src/php/config/conexion_BD.php';
 
-    // =========================================================================
-    // 2. LÓGICA DE ACCESO RÁPIDO (BOTONES DE ROL DEMO) - SIN INSERCIONES
+   // =========================================================================
+    // 2. LÓGICA DE ACCESO RÁPIDO (BOTONES DE ROL DEMO) - MAPEO DE CUENTAS
     // =========================================================================
     if (isset($_POST['demo_login']) && isset($_POST['rol_demo'])) {
         $rolDemo = $_POST['rol_demo'];
-        $correoDemo = $rolDemo . "_demo@kion.com";
+
+        // Correos exactos extraídos de tu base de datos
+        $correosPorRol = [
+            'admin'   => 'admin_demo@kion.com',
+            'gerente' => 'GerenteManzanillo@gmail.com',
+            'usuario' => 'usuario_demo@kion.com'
+        ];
+
+        $correoDemo = $correosPorRol[$rolDemo] ?? ($rolDemo . "_demo@kion.com");
 
         try {
-            // Comprobar que el usuario demo ya existe en la BD
             $consulta = $pdo->prepare('SELECT u.id_usuario, u.nombre, u.apellido, u.correo, u.password_hash, u.id_rol, u.id_sucursal, u.estado, r.nombre AS rol FROM usuarios u LEFT JOIN roles r ON r.id_rol = u.id_rol WHERE u.correo = ? LIMIT 1');
             $consulta->execute([$correoDemo]);
             $usuario = $consulta->fetch();
@@ -44,24 +51,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$usuario) {
                 if ($esPeticionAjax) {
                     header('Content-Type: application/json; charset=utf-8');
-                    echo json_encode(['ok' => false, 'message' => 'El usuario de prueba no existe en la base de datos.']);
+                    echo json_encode(['ok' => false, 'message' => "El usuario ($correoDemo) no existe en la base de datos."]);
                     exit;
                 }
             }
 
-            // Iniciamos sesión
             session_regenerate_id(true);
             $_SESSION['usuario'] = [
-                'id_usuario' => $usuario['id_usuario'],
-                'nombre' => $usuario['nombre'],
-                'apellido' => $usuario['apellido'],
-                'correo' => $usuario['correo'],
-                'id_rol' => $usuario['id_rol'],
+                'id_usuario'  => $usuario['id_usuario'],
+                'nombre'      => $usuario['nombre'],
+                'apellido'    => $usuario['apellido'],
+                'correo'      => $usuario['correo'],
+                'id_rol'      => $usuario['id_rol'],
                 'id_sucursal' => $usuario['id_sucursal'],
-                'rol' => $usuario['rol'] ?? $rolDemo,
+                'rol'         => $usuario['rol'] ?? $rolDemo,
             ];
 
-            // Determinamos a qué dashboard va
             $rolNombre = strtolower(trim($_SESSION['usuario']['rol']));
             if (strpos($rolNombre, 'admin') !== false) {
                 $destino = 'src/php/modulos/home/dashboard.php';
