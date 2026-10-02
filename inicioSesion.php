@@ -13,7 +13,7 @@ function responderInicioSesion(bool $ok, string $message, ?string $redirect = nu
         JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
     );
     exit;
-}
+}   
 
 function obtenerDestinoUsuario(array $usuario): string
 {
@@ -27,9 +27,13 @@ function obtenerDestinoUsuario(array $usuario): string
         'rol' => $usuario['rol'],
     ];
 
-    return $usuario['rol'] === 'Usuario'
-        ? 'src/php/componentes/catalogo.php'
-        : 'src/php/modulos/home/dashboard.php';
+    $rolNombre = strtolower(trim($usuario['rol'] ?? ''));
+    if (strpos($rolNombre, 'admin') !== false) {
+        return 'src/php/modulos/home/dashboard.php';
+    } elseif (strpos($rolNombre, 'gerente') !== false || strpos($rolNombre, 'cajero') !== false) {
+        return 'src/php/modulos/home/dashboard_gerente.php'; // Ajusta esto si el gerente/cajero tienen otro panel
+    }
+    return 'src/php/componentes/catalogo.php';
 }
 
 function cookieSegura(): bool
@@ -55,6 +59,43 @@ $accion = $_POST['action'] ?? '';
 $accion = is_string($accion) ? $accion : '';
 
 require_once __DIR__ . '/src/php/config/conexion_BD.php';
+
+// =========================================================================
+// API AJAX: OBTENER LISTA DE USUARIOS POR ROL (MODO DEMO)
+// =========================================================================
+if (isset($_GET['action']) && $_GET['action'] === 'get_usuarios_por_rol' && DEV_MODE === true) {
+    $rolBuscado = trim($_GET['rol'] ?? '');
+    try {
+        $sql = "SELECT u.id_usuario, u.nombre, u.apellido, u.correo, COALESCE(s.nombre, 'Sin sucursal') AS sucursal 
+                FROM usuarios u 
+                LEFT JOIN roles r ON r.id_rol = u.id_rol 
+                LEFT JOIN sucursales s ON s.id_sucursal = u.id_sucursal 
+                WHERE u.estado = 'ACTIVO'";
+
+        if ($rolBuscado === 'admin') {
+            $sql .= " AND r.nombre LIKE '%admin%'";
+        } elseif ($rolBuscado === 'gerente') {
+            $sql .= " AND r.nombre LIKE '%gerente%'";
+        } elseif ($rolBuscado === 'cajero') {
+            $sql .= " AND r.nombre LIKE '%cajero%'";
+        } else {
+            $sql .= " AND (r.nombre LIKE '%usuario%' OR r.nombre LIKE '%cliente%')";
+        }
+        $sql .= " ORDER BY u.nombre ASC";
+        
+        $stmt = $pdo->query($sql);
+        $usuarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => true, 'data' => $usuarios]);
+        exit;
+    } catch (PDOException $e) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'message' => 'Error al consultar usuarios.']);
+        exit;
+    }
+}
+
 if ($pdo === null && ($metodoPost || (!isset($_SESSION['usuario']) && isset($_COOKIE['kion_remember'])))) {
     if ($metodoPost) {
         responderInicioSesion(false, $errorConexion ?? 'No fue posible conectar con la base de datos.');
@@ -71,10 +112,8 @@ if (!$metodoPost && !isset($_SESSION['usuario']) && isset($_COOKIE['kion_remembe
             $usuarioRecordado = $consultaRecordarme->fetch();
             if ($usuarioRecordado && $usuarioRecordado['estado'] === 'ACTIVO') {
                 session_regenerate_id(true);
-                obtenerDestinoUsuario($usuarioRecordado);
-                header('Location: ' . ($usuarioRecordado['rol'] === 'Usuario'
-                    ? 'src/php/componentes/catalogo.php'
-                    : 'src/php/modulos/home/dashboard.php'));
+                $destino = obtenerDestinoUsuario($usuarioRecordado);
+                header('Location: ' . $destino);
                 exit;
             }
             $limpiarToken = $pdo->prepare('UPDATE usuarios SET remember_token = NULL, remember_expires_at = NULL WHERE remember_token = ?');
@@ -97,6 +136,34 @@ if ($metodoPost) {
 
     if ($pdo === null) {
         responderInicioSesion(false, $errorConexion ?? 'No fue posible conectar con la base de datos.');
+    }
+
+    // =========================================================================
+    // PROCESAMIENTO DE ACCESO RÁPIDO (MODO DEMO)
+    // =========================================================================
+    if (isset($_POST['demo_login']) && DEV_MODE === true) {
+        $idUsuarioDemo = (int)($_POST['id_usuario_demo'] ?? 0);
+        
+        try {
+            $consulta = $pdo->prepare('SELECT u.id_usuario, u.nombre, u.apellido, u.correo, u.password_hash, u.id_rol, u.id_sucursal, u.estado, r.nombre AS rol FROM usuarios u LEFT JOIN roles r ON r.id_rol = u.id_rol WHERE u.id_usuario = ? LIMIT 1');
+            $consulta->execute([$idUsuarioDemo]);
+            $usuario = $consulta->fetch();
+
+            if (!$usuario) {
+                responderInicioSesion(false, 'El usuario seleccionado no existe en la base de datos.');
+            }
+            if ($usuario['estado'] !== 'ACTIVO') {
+                responderInicioSesion(false, 'Esta cuenta se encuentra inactiva.');
+            }
+
+            session_regenerate_id(true);
+            $destino = obtenerDestinoUsuario($usuario);
+            responderInicioSesion(true, 'Acceso de prueba correcto.', $destino);
+
+        } catch (PDOException $e) {
+            error_log('KION demo login: ' . $e->getMessage());
+            responderInicioSesion(false, 'Error de BD al procesar rol de prueba.');
+        }
     }
 
     if ($accion === 'recuperar') {
@@ -138,6 +205,7 @@ if ($metodoPost) {
     $correo = is_string($correo) ? trim($correo) : '';
     $contrasena = $_POST['contrasena'] ?? '';
     $contrasena = is_string($contrasena) ? $contrasena : '';
+    
     if (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
         responderInicioSesion(false, 'Escribe un correo electrónico válido.');
     }
@@ -303,18 +371,20 @@ if ($metodoPost) {
         .btn-secondary { min-height: 38px; padding: 0 13px; border: 1px solid var(--field-border); border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; font: inherit; font-size: 12px; }
         .btn-secondary:hover { border-color: var(--gold); color: var(--text-main); }
         .dialog-submit { min-height: 38px; padding: 0 15px; border: 0; border-radius: 8px; background: linear-gradient(135deg, #e6c260, #c9a444); color: #17130a; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+        
         <?php if (DEV_MODE === true): ?>
-        .role-demo-link { display: inline-block; margin-top: 8px; color: var(--text-muted) !important; font-size: 10px; font-weight: 400 !important; }
+        .role-demo-link { display: inline-block; margin-top: 8px; color: var(--text-muted) !important; font-size: 10px; font-weight: 400 !important; cursor: pointer; }
         .role-overlay { position: fixed; inset: 0; z-index: 6; display: none; place-items: center; padding: 16px; background: rgba(0, 0, 0, .66); backdrop-filter: blur(6px); }
         .role-overlay.visible { display: grid; }
         .role-picker { position: relative; width: min(330px, 100%); padding: 22px; border: 1px solid rgba(201, 164, 68, .3); border-radius: 12px; background: #171717; }
         .role-picker h2 { margin: 0 0 7px; color: var(--gold-light); font-size: 17px; text-align: center; }
         .role-picker p { margin: 0 0 14px; color: var(--text-muted); font-size: 11px; text-align: center; }
         .role-options { display: grid; gap: 7px; }
-        .role-option { padding: 9px; border: 1px solid var(--field-border); border-radius: 7px; color: var(--text-main); font-size: 12px; text-align: center; text-decoration: none; }
-        .role-option:hover { border-color: var(--gold); color: var(--gold-light); }
+        .role-option { display: block; width: 100%; padding: 9px; border: 1px solid var(--field-border); border-radius: 7px; color: var(--text-main); font-size: 12px; text-align: center; text-decoration: none; background: transparent; cursor: pointer; transition: all 0.2s ease; }
+        .role-option:hover { border-color: var(--gold); color: var(--gold-light); background: rgba(201, 164, 68, .1); }
         .role-picker-close { position: absolute; top: 6px; right: 8px; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 22px; }
         <?php endif; ?>
+        
         @keyframes pageEnter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pageExit { to { opacity: 0; transform: translateY(-5px); } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -375,6 +445,7 @@ if ($metodoPost) {
         </div>
     </main>
 
+    <!-- Modal Recuperación -->
     <div class="dialog-backdrop" id="recoveryBackdrop">
         <section class="recovery-dialog" role="dialog" aria-modal="true" aria-labelledby="recoveryTitle">
             <div class="dialog-head">
@@ -398,18 +469,30 @@ if ($metodoPost) {
         </section>
     </div>
 
+    <!-- Modal Roles (2 Pasos) -->
     <?php if (DEV_MODE === true): ?>
         <div class="role-overlay" id="roleOverlay">
             <section class="role-picker" role="dialog" aria-modal="true" aria-labelledby="rolePickerTitle">
                 <button class="role-picker-close" id="closeRolePicker" type="button" aria-label="Cerrar">&times;</button>
-                <h2 id="rolePickerTitle">Seleccionar rol</h2>
-                <p>Acceso rápido para la exposición de avances.</p>
-                <nav class="role-options" aria-label="Roles de demostración">
-                    <a class="role-option" href="src/php/modulos/home/dashboard.php">Administrador General</a>
-                    <a class="role-option" href="src/php/modulos/home/dashboard.php">Gerente</a>
-                    <a class="role-option" href="src/php/modulos/home/dashboard.php">Cajero</a>
-                    <a class="role-option" href="src/php/componentes/catalogo.php">Usuario</a>
+                
+                <!-- Cabecera de 2 pasos -->
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <button id="btnVolverRoles" type="button" style="display: none; background: none; border: none; color: var(--gold-light); cursor: pointer; font-size: 12px; font-weight: bold; padding:0;">← Volver</button>
+                    <h2 id="rolePickerTitle" style="margin: 0; flex: 1; text-align: center;">Seleccionar rol</h2>
+                </div>
+                <p id="rolePickerSub" style="margin: 0 0 14px; color: var(--text-muted); font-size: 11px; text-align: center;">Acceso rápido para la exposición de avances.</p>
+
+                <!-- Paso 1: Elegir el tipo de rol -->
+                <nav class="role-options" id="stepRoles" aria-label="Roles de demostración">
+                    <button type="button" class="role-option btn-rol-categoria" data-rol="admin">Administrador General</button>
+                    <button type="button" class="role-option btn-rol-categoria" data-rol="gerente">Gerente</button>
+                    <button type="button" class="role-option btn-rol-categoria" data-rol="cajero">Cajero</button>
+                    <button type="button" class="role-option btn-rol-categoria" data-rol="usuario">Usuario / Cliente</button>
                 </nav>
+
+                <!-- Paso 2: Elegir el usuario (Llenado con AJAX) -->
+                <div class="role-options" id="stepUsuarios" style="display: none; max-height: 220px; overflow-y: auto; padding-right: 5px;">
+                </div>
             </section>
         </div>
     <?php endif; ?>
@@ -430,7 +513,7 @@ if ($metodoPost) {
         async function sendForm(form, notice, successDelay = 1500) {
             notice.className = 'notice';
             const button = form.querySelector('button[type="submit"]');
-            button.disabled = true;
+            if (button) button.disabled = true;
             try {
                 const response = await fetch(window.location.href, {
                     method: 'POST',
@@ -447,7 +530,7 @@ if ($metodoPost) {
             } catch (error) {
                 showNotice(notice, 'No fue posible conectar con el servidor. Inténtalo de nuevo.', 'error');
             } finally {
-                button.disabled = false;
+                if (button) button.disabled = false;
             }
         }
 
@@ -524,15 +607,108 @@ if ($metodoPost) {
             });
         });
 
+        // =====================================================================
+        // LÓGICA DE ROLES: 2 PASOS (JS)
+        // =====================================================================
         <?php if (DEV_MODE === true): ?>
         const roleOverlay = document.getElementById('roleOverlay');
+        const stepRoles = document.getElementById('stepRoles');
+        const stepUsuarios = document.getElementById('stepUsuarios');
+        const btnVolverRoles = document.getElementById('btnVolverRoles');
+        const rolePickerTitle = document.getElementById('rolePickerTitle');
+        const rolePickerSub = document.getElementById('rolePickerSub');
+
         document.getElementById('openRolePicker').addEventListener('click', (event) => {
             event.preventDefault();
+            mostrarPasoRoles();
             roleOverlay.classList.add('visible');
         });
+        
         document.getElementById('closeRolePicker').addEventListener('click', () => roleOverlay.classList.remove('visible'));
+        
         roleOverlay.addEventListener('click', (event) => {
             if (event.target === roleOverlay) roleOverlay.classList.remove('visible');
+        });
+
+        function mostrarPasoRoles() {
+            stepRoles.style.display = 'grid';
+            stepUsuarios.style.display = 'none';
+            btnVolverRoles.style.display = 'none';
+            rolePickerTitle.textContent = 'Seleccionar rol';
+            rolePickerSub.textContent = 'Acceso rápido para la exposición de avances.';
+        }
+
+        btnVolverRoles.addEventListener('click', mostrarPasoRoles);
+
+        document.querySelectorAll('.btn-rol-categoria').forEach((btn) => {
+            btn.addEventListener('click', (evento) => {
+                evento.preventDefault();
+                const rol = btn.dataset.rol;
+
+                stepUsuarios.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:10px;">Cargando usuarios...</p>';
+                stepRoles.style.display = 'none';
+                stepUsuarios.style.display = 'grid';
+                btnVolverRoles.style.display = 'inline-block';
+
+                rolePickerTitle.textContent = `Usuarios: ${btn.textContent}`;
+                rolePickerSub.textContent = 'Selecciona la cuenta con la que deseas ingresar.';
+
+                fetch(`?action=get_usuarios_por_rol&rol=${rol}`)
+                    .then(res => res.json())
+                    .then(res => {
+                        if (!res.ok || !res.data || res.data.length === 0) {
+                            stepUsuarios.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:10px;">No se encontraron usuarios activos en este rol.</p>';
+                            return;
+                        }
+
+                        stepUsuarios.innerHTML = res.data.map(u => `
+                            <button type="button" class="role-option btn-seleccionar-usuario" 
+                                    data-id="${u.id_usuario}" 
+                                    data-correo="${u.correo}">
+                                <div style="font-weight: bold; margin-bottom:3px;">${u.nombre} ${u.apellido}</div>
+                                <div style="font-size: 10px; opacity: 0.7;">${u.correo} <br> ${u.sucursal}</div>
+                            </button>
+                        `).join('');
+                    })
+                    .catch(() => {
+                        stepUsuarios.innerHTML = '<p style="text-align:center; color:var(--error-red); font-size:12px; padding:10px;">Error de conexión.</p>';
+                    });
+            });
+        });
+
+        stepUsuarios.addEventListener('click', (e) => {
+            const btnUser = e.target.closest('.btn-seleccionar-usuario');
+            if (!btnUser) return;
+
+            const idUsuario = btnUser.dataset.id;
+            const correo = btnUser.dataset.correo;
+
+            // Llenado visual
+            document.getElementById('correo').value = correo;
+            document.getElementById('contrasena').value = '••••••••';
+            roleOverlay.classList.remove('visible');
+
+            // Preparar y enviar petición
+            const formData = new FormData();
+            formData.append('id_usuario_demo', idUsuario);
+            formData.append('demo_login', '1');
+            formData.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+
+            fetch(window.location.href, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            })
+            .then(res => res.json())
+            .then(resultado => {
+                if (resultado.ok) {
+                    showNotice(loginNotice, resultado.message, 'success');
+                    setTimeout(() => window.location.href = resultado.redirect, 500);
+                } else {
+                    showNotice(loginNotice, resultado.message, 'error');
+                }
+            })
+            .catch(() => showNotice(loginNotice, 'Error de conexión con el servidor.', 'error'));
         });
         <?php endif; ?>
 

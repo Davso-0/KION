@@ -22,9 +22,6 @@ if (file_exists(__DIR__ . '/../../config/conexion_BD.php')) {
     require_once __DIR__ . '/../../config/conexion.php';
 }
 
-// --------------------------------------------------------------
-// Resolver el usuario en sesión y VERIFICAR que su rol sea Admin
-// --------------------------------------------------------------
 $id_usuario_actual = 0;
 if (is_array($_SESSION['usuario'] ?? null)) {
     $id_usuario_actual = (int)($_SESSION['usuario']['id_usuario'] ?? $_SESSION['usuario']['id'] ?? 0);
@@ -43,19 +40,17 @@ if (isset($pdo) && $pdo instanceof PDO && $id_usuario_actual > 0) {
 $esAdmin = $admin && stripos((string)($admin['rol'] ?? ''), 'admin') !== false && ($admin['estado'] ?? '') !== 'INACTIVO';
 $nombreAdmin = trim(($admin['nombre'] ?? 'Administrador') . ' ' . ($admin['apellido'] ?? ''));
 
-// --------------------------------------------------------------
-// API (AJAX) — toda acción exige rol de Administrador verificado
-// --------------------------------------------------------------
+// API AJAX
 if (isset($_GET['action'])) {
     $action = $_GET['action'];
     $out = ['ok' => false, 'msg' => 'Acción desconocida'];
     try {
         if (!isset($pdo) || !($pdo instanceof PDO)) {
-            throw new RuntimeException('[ERROR DE SISTEMA] No fue posible conectar con la base de datos. Revisa tus credenciales.');
+            throw new RuntimeException('[ERROR DE SISTEMA] No fue posible conectar con la base de datos.');
         }
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         if (!$esAdmin) {
-            throw new RuntimeException('[ERROR DE SISTEMA] Tu sesión no tiene permisos de administrador. Inicia sesión nuevamente.');
+            throw new RuntimeException('[ERROR DE SISTEMA] Tu sesión no tiene permisos de administrador.');
         }
 
         if ($action === 'get_metrics') {
@@ -65,12 +60,8 @@ if (isset($_GET['action'])) {
             $inv_data = $pdo->query("SELECT COALESCE(SUM(i.existencias),0) AS piezas, COALESCE(SUM(i.existencias * p.precio),0) AS valor FROM inventarios i JOIN productos p ON p.id_producto = i.id_producto")->fetch(PDO::FETCH_ASSOC);
             $ti = (int)($inv_data['piezas'] ?? 0);
             $valor_inv = (float)($inv_data['valor'] ?? 0);
-
             $rv = $pdo->query("SELECT COUNT(*) AS n, COALESCE(SUM(total),0) AS t FROM ventas WHERE DATE(fecha_hora)=CURDATE()")->fetch();
-            $out = ['ok' => true, 'data' => [
-                'ts' => $ts, 'tu' => $tu, 'tp' => $tp, 'ti' => $ti, 'valor_inv' => $valor_inv,
-                'vh' => (int)($rv['n'] ?? 0), 'ih' => (float)($rv['t'] ?? 0)
-            ]];
+            $out = ['ok' => true, 'data' => [ 'ts' => $ts, 'tu' => $tu, 'tp' => $tp, 'ti' => $ti, 'valor_inv' => $valor_inv, 'vh' => (int)($rv['n'] ?? 0), 'ih' => (float)($rv['t'] ?? 0) ]];
 
         } elseif ($action === 'get_sucursales') {
             $stmt = $pdo->query("SELECT id_sucursal, nombre, direccion, telefono, contacto, estado FROM sucursales ORDER BY id_sucursal");
@@ -85,26 +76,21 @@ if (isset($_GET['action'])) {
 
         } elseif ($action === 'update_sucursal') {
             $id = (int)($_POST['id'] ?? 0); $nombre = trim($_POST['nombre'] ?? ''); $tel = trim($_POST['telefono'] ?? '');
-            if (!$id || !$nombre) throw new Exception('[ERROR DE USUARIO] Faltan datos obligatorios para actualizar.');
+            if (!$id || !$nombre) throw new Exception('[ERROR DE USUARIO] Faltan datos obligatorios.');
             $est = ($_POST['estado'] ?? 'ACTIVA') === 'INACTIVA' ? 'INACTIVA' : 'ACTIVA';
             $pdo->prepare("UPDATE sucursales SET nombre=?,direccion=?,telefono=?,contacto=?,estado=? WHERE id_sucursal=?")
                 ->execute([$nombre, trim($_POST['direccion'] ?? ''), $tel, trim($_POST['contacto'] ?? ''), $est, $id]);
             $out = ['ok' => true, 'msg' => 'Datos de la sucursal actualizados.'];
 
         } elseif ($action === 'get_gerentes') {
-            
             $st = $pdo->query("SELECT u.id_usuario,u.nombre,u.apellido,u.correo,u.estado,r.nombre AS rol,COALESCE(s.nombre,'-- Ninguna --') AS sucursal,u.id_sucursal,u.id_rol FROM usuarios u LEFT JOIN roles r ON r.id_rol=u.id_rol LEFT JOIN sucursales s ON s.id_sucursal=u.id_sucursal WHERE r.nombre NOT LIKE '%cliente%' AND r.nombre NOT LIKE '%usuario%' ORDER BY u.id_usuario");
-            $out = ['ok' => true, 'data' => $st->fetchAll(PDO::FETCH_ASSOC)];
-
-        } elseif ($action === 'get_gerentes') {
-            $st = $pdo->query("SELECT u.id_usuario,u.nombre,u.apellido,u.correo,u.estado,r.nombre AS rol,COALESCE(s.nombre,'-- Ninguna --') AS sucursal,u.id_sucursal,u.id_rol FROM usuarios u LEFT JOIN roles r ON r.id_rol=u.id_rol LEFT JOIN sucursales s ON s.id_sucursal=u.id_sucursal ORDER BY u.id_usuario");
             $out = ['ok' => true, 'data' => $st->fetchAll(PDO::FETCH_ASSOC)];
 
         } elseif ($action === 'delete_gerente') {
             $id = (int)($_POST['id'] ?? 0);
-            if ($id === $id_usuario_actual) throw new Exception('[ERROR DE USUARIO] No puedes eliminar tu propio usuario mientras tienes sesión activa.');
+            if ($id === $id_usuario_actual) throw new Exception('[ERROR DE USUARIO] No puedes eliminar tu propio usuario.');
             $pdo->prepare("DELETE FROM usuarios WHERE id_usuario=?")->execute([$id]);
-            $out = ['ok' => true, 'msg' => 'Registro del personal eliminado.'];
+            $out = ['ok' => true, 'msg' => 'Registro eliminado.'];
 
         } elseif ($action === 'get_roles') {
             try { $data = $pdo->query("SELECT id_rol, nombre FROM roles ORDER BY id_rol")->fetchAll(PDO::FETCH_ASSOC); } catch (Exception $e) { $data = []; }
@@ -116,7 +102,7 @@ if (isset($_GET['action'])) {
 
         } elseif ($action === 'get_productos') {
             $q = trim($_GET['q'] ?? '');
-            $sql = "SELECT p.id_producto,p.codigo,p.nombre,p.descripcion,p.id_categoria,p.precio,p.estado,COALESCE(c.nombre, 'Sin categoría') AS categoria FROM productos p LEFT JOIN categorias c ON c.id_categoria=p.id_categoria";
+            $sql = "SELECT p.id_producto,p.codigo,p.nombre,p.descripcion,p.imagen_url,p.id_categoria,p.precio,p.estado,COALESCE(c.nombre, 'Sin categoría') AS categoria FROM productos p LEFT JOIN categorias c ON c.id_categoria=p.id_categoria";
             $params = [];
             if ($q !== '') { $sql .= " WHERE p.codigo LIKE ? OR p.nombre LIKE ?"; $params[] = "%$q%"; $params[] = "%$q%"; }
             $sql .= " ORDER BY p.nombre ASC LIMIT 200";
@@ -127,6 +113,7 @@ if (isset($_GET['action'])) {
             $id = (int)($_POST['id'] ?? 0); $codigo = trim($_POST['codigo'] ?? ''); $nombre = trim($_POST['nombre'] ?? '');
             $descripcion = trim($_POST['descripcion'] ?? ''); $categoria = (int)($_POST['id_categoria'] ?? 0);
             $precio = (float)str_replace(',', '.', $_POST['precio'] ?? '0');
+            $imagenUrl = trim($_POST['imagen_url'] ?? '');
             $estado = ($_POST['estado'] ?? 'ACTIVO') === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO';
             $sucs = $_POST['sucursales'] ?? [];
             if ($codigo === '' || $nombre === '') throw new Exception('[ERROR DE USUARIO] El código y el nombre son obligatorios.');
@@ -134,17 +121,17 @@ if (isset($_GET['action'])) {
             $pdo->beginTransaction();
             try {
                 if ($action === 'create_producto') {
-                    $pdo->prepare("INSERT INTO productos(codigo,nombre,descripcion,id_categoria,precio,estado) VALUES(?,?,?,?,?,?)")
-                        ->execute([$codigo, $nombre, $descripcion ?: null, $categoria > 0 ? $categoria : null, $precio, $estado]);
+                    $pdo->prepare("INSERT INTO productos(codigo,nombre,descripcion,id_categoria,precio,estado,imagen_url) VALUES(?,?,?,?,?,?,?)")
+                        ->execute([$codigo, $nombre, $descripcion ?: null, $categoria > 0 ? $categoria : null, $precio, $estado, $imagenUrl ?: null]);
                     $new_id = (int)$pdo->lastInsertId();
                     if (!empty($sucs)) {
                         $st_inv = $pdo->prepare("INSERT INTO inventarios(id_producto, id_sucursal, existencias, stock_minimo) VALUES(?,?,0,5)");
                         foreach ($sucs as $sid) $st_inv->execute([$new_id, $sid]);
                     }
-                    $out = ['ok' => true, 'msg' => 'Producto registrado exitosamente. (Stock inicial en 0)'];
+                    $out = ['ok' => true, 'msg' => 'Producto registrado exitosamente.'];
                 } else {
-                    $pdo->prepare("UPDATE productos SET codigo=?,nombre=?,descripcion=?,id_categoria=?,precio=?,estado=? WHERE id_producto=?")
-                        ->execute([$codigo, $nombre, $descripcion ?: null, $categoria > 0 ? $categoria : null, $precio, $estado, $id]);
+                    $pdo->prepare("UPDATE productos SET codigo=?,nombre=?,descripcion=?,id_categoria=?,precio=?,estado=?,imagen_url=? WHERE id_producto=?")
+                        ->execute([$codigo, $nombre, $descripcion ?: null, $categoria > 0 ? $categoria : null, $precio, $estado, $imagenUrl ?: null, $id]);
                     if (!empty($sucs)) {
                         $st_check = $pdo->prepare("SELECT COUNT(*) FROM inventarios WHERE id_producto=? AND id_sucursal=?");
                         $st_inv = $pdo->prepare("INSERT INTO inventarios(id_producto, id_sucursal, existencias, stock_minimo) VALUES(?,?,0,5)");
@@ -160,32 +147,9 @@ if (isset($_GET['action'])) {
 
         } elseif ($action === 'delete_producto') {
             $id = (int)($_POST['id'] ?? 0);
-            if (!$id) throw new Exception('[ERROR DE SISTEMA] ID de producto inválido.');
             $pdo->prepare("DELETE FROM inventarios WHERE id_producto=?")->execute([$id]);
             $pdo->prepare("DELETE FROM productos WHERE id_producto=?")->execute([$id]);
             $out = ['ok' => true, 'msg' => 'Producto eliminado permanentemente.'];
-
-        } elseif ($action === 'get_sucursales_por_producto') {
-            $id_p = (int)($_GET['id_producto'] ?? 0);
-            $st = $pdo->prepare("SELECT s.id_sucursal, s.nombre FROM inventarios i JOIN sucursales s ON s.id_sucursal = i.id_sucursal WHERE i.id_producto = ?");
-            $st->execute([$id_p]);
-            $out = ['ok' => true, 'data' => $st->fetchAll(PDO::FETCH_ASSOC)];
-
-        } elseif ($action === 'ajustar_stock') {
-            $id_p = (int)($_POST['id_producto'] ?? 0); $id_s = (int)($_POST['id_sucursal'] ?? 0);
-            $cant = (int)($_POST['cantidad'] ?? 0); $tipo = $_POST['tipo'] ?? '';
-            if (!$id_p || !$id_s) throw new Exception('[ERROR DE USUARIO] Debes seleccionar un producto y una sucursal válidos.');
-            if ($cant < 0) throw new Exception('[ERROR DE USUARIO] No puedes ingresar cantidades negativas.');
-            $st = $pdo->prepare("SELECT existencias FROM inventarios WHERE id_producto=? AND id_sucursal=?");
-            $st->execute([$id_p, $id_s]);
-            $row = $st->fetch();
-            if (!$row) throw new Exception("[ERROR DE USUARIO] Ese producto no existe en la sucursal seleccionada. Ve a 'Productos', edítalo y asígnale esta sucursal primero.");
-            $nueva_cant = $row['existencias'];
-            if ($tipo === 'entrada') $nueva_cant += $cant;
-            elseif ($tipo === 'salida') $nueva_cant = max(0, $nueva_cant - $cant);
-            elseif ($tipo === 'reemplazo') $nueva_cant = $cant;
-            $pdo->prepare("UPDATE inventarios SET existencias=? WHERE id_producto=? AND id_sucursal=?")->execute([$nueva_cant, $id_p, $id_s]);
-            $out = ['ok' => true, 'msg' => "Stock actualizado correctamente. Nueva existencia: $nueva_cant unidades."];
 
         } elseif ($action === 'get_producto_detalle') {
             $id = (int)($_GET['id'] ?? 0);
@@ -196,9 +160,6 @@ if (isset($_GET['action'])) {
         } elseif ($action === 'get_sucursales_simple') {
             $out = ['ok' => true, 'data' => $pdo->query("SELECT id_sucursal,nombre FROM sucursales WHERE estado='ACTIVA' ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC)];
 
-        } elseif ($action === 'get_productos_simple') {
-            $out = ['ok' => true, 'data' => $pdo->query("SELECT id_producto, nombre, codigo FROM productos WHERE estado='ACTIVO' ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC)];
-
         } elseif ($action === 'create_gerente' || $action === 'update_gerente') {
             $id = (int)($_POST['id'] ?? 0); $nom = trim($_POST['nombre'] ?? ''); $cor = trim($_POST['correo'] ?? '');
             $pas = trim($_POST['password'] ?? ''); $rol = (int)($_POST['id_rol'] ?? 0);
@@ -207,27 +168,25 @@ if (isset($_GET['action'])) {
 
             $st_r = $pdo->prepare("SELECT nombre FROM roles WHERE id_rol = ?");
             $st_r->execute([$rol]);
-            $rname = $st_r->fetchColumn() ?: '';
-            $is_admin = (stripos($rname, 'admin') !== false);
-            if (!$is_admin && !$suc) throw new Exception('[ERROR DE USUARIO] Los Gerentes y Cajeros DEBEN tener una sucursal asignada.');
+            $is_admin = (stripos($st_r->fetchColumn() ?: '', 'admin') !== false);
+            if (!$is_admin && !$suc) throw new Exception('[ERROR DE USUARIO] Los Gerentes y Cajeros DEBEN tener una sucursal.');
             if ($is_admin) $suc = null;
 
             $st_mail = $pdo->prepare("SELECT COUNT(*) FROM usuarios WHERE correo=? AND id_usuario<>?");
             $st_mail->execute([$cor, $id]);
-            if ($st_mail->fetchColumn() > 0) throw new Exception('[ERROR DE USUARIO] Ya existe otro usuario registrado con ese correo.');
+            if ($st_mail->fetchColumn() > 0) throw new Exception('Ya existe otro usuario con ese correo.');
 
             if ($action === 'create_gerente') {
-                if ($pas === '') throw new Exception('[ERROR DE USUARIO] La contraseña es obligatoria para un nuevo registro.');
+                if ($pas === '') throw new Exception('La contraseña es obligatoria.');
                 $pdo->prepare("INSERT INTO usuarios(nombre,apellido,correo,password_hash,id_rol,id_sucursal,estado)VALUES(?,?,?,?,?,?,'ACTIVO')")
                     ->execute([$nom, trim($_POST['apellido'] ?? ''), $cor, password_hash($pas, PASSWORD_BCRYPT), $rol, $suc]);
-                $out = ['ok' => true, 'msg' => 'Personal registrado correctamente.'];
+                $out = ['ok' => true, 'msg' => 'Personal registrado.'];
             } else {
                 $est = ($_POST['estado'] ?? 'ACTIVO') === 'INACTIVO' ? 'INACTIVO' : 'ACTIVO';
-                if ($id === $id_usuario_actual && $est === 'INACTIVO') throw new Exception('[ERROR DE USUARIO] No puedes desactivar tu propio usuario mientras tienes sesión activa.');
                 $pdo->prepare("UPDATE usuarios SET nombre=?,apellido=?,correo=?,id_rol=?,id_sucursal=?,estado=? WHERE id_usuario=?")
                     ->execute([$nom, trim($_POST['apellido'] ?? ''), $cor, $rol, $suc, $est, $id]);
                 if ($pas !== '') $pdo->prepare("UPDATE usuarios SET password_hash=? WHERE id_usuario=?")->execute([password_hash($pas, PASSWORD_BCRYPT), $id]);
-                $out = ['ok' => true, 'msg' => 'Información del personal actualizada.'];
+                $out = ['ok' => true, 'msg' => 'Personal actualizado.'];
             }
 
         } elseif ($action === 'get_inventarios') {
@@ -250,7 +209,6 @@ if (isset($_GET['action'])) {
             $sql .= " ORDER BY v.fecha_hora DESC LIMIT 200";
             $st = $pdo->prepare($sql); $st->execute($params);
             $out = ['ok' => true, 'data' => $st->fetchAll(PDO::FETCH_ASSOC)];
-
         } elseif ($action === 'get_venta_detalle') {
             $id = (int)($_GET['id'] ?? 0);
             $st = $pdo->prepare("SELECT dv.cantidad, dv.precio_unitario, dv.subtotal, COALESCE(p.nombre, 'Producto no disponible') AS producto FROM detalle_ventas dv LEFT JOIN productos p ON p.id_producto = dv.id_producto WHERE dv.id_venta = ?");
@@ -258,15 +216,7 @@ if (isset($_GET['action'])) {
             $out = ['ok' => true, 'data' => $st->fetchAll(PDO::FETCH_ASSOC)];
         }
     } catch (Throwable $e) {
-        $msg = $e->getMessage();
-        if (strpos($msg, 'Base table or view not found') !== false) {
-            $msg = "[ERROR DE SISTEMA/CÓDIGO] Te falta crear una tabla en tu base de datos: " . str_replace('SQLSTATE[42S02]: Base table or view not found: 1146 Table', '', $msg);
-        } elseif (strpos($msg, 'Column not found') !== false) {
-            $msg = "[ERROR DE SISTEMA/CÓDIGO] Te falta una columna en tu tabla: " . str_replace('SQLSTATE[42S22]: Column not found: 1054 Unknown column', '', $msg);
-        } elseif (strpos($msg, 'Integrity constraint violation') !== false) {
-            $msg = "[ERROR DE USUARIO] Estás intentando eliminar un registro que ya está vinculado a otras partes del sistema (como una venta). Es mejor ponerlo como INACTIVO.";
-        }
-        $out = ['ok' => false, 'msg' => $msg];
+        $out = ['ok' => false, 'msg' => $e->getMessage()];
     }
     ob_end_clean();
     header('Content-Type: application/json; charset=utf-8');
@@ -274,14 +224,9 @@ if (isset($_GET['action'])) {
     exit;
 }
 
-// --------------------------------------------------------------
-// Render de la página — bloquea a cualquiera que no sea Admin
-// --------------------------------------------------------------
 if (!$esAdmin) {
     ob_end_clean();
-    echo '<!doctype html><meta charset="utf-8"><body style="font-family:sans-serif;padding:60px;text-align:center;color:#6c4630;">
-    <h2>Acceso restringido</h2><p>Esta sección es exclusiva para el rol de Administrador.</p>
-    <p><a href="home.php">Volver al inicio</a></p></body>';
+    echo '<!doctype html><meta charset="utf-8"><body style="font-family:sans-serif;padding:60px;text-align:center;"><h2>Acceso restringido</h2><a href="home.php">Volver al inicio</a></body>';
     exit;
 }
 
@@ -360,7 +305,6 @@ try {
 
         .sidebar-collapse-btn { position: absolute; top: 26px; right: -13px; width: 26px; height: 26px; border-radius: 50%; background: var(--bg-surface); border: 1px solid var(--border-soft); color: var(--coffee-main); display: grid; place-items: center; box-shadow: var(--shadow-sm); z-index: 41; transition: transform .3s var(--ease-expo); }
         .app-layout.is-collapsed .sidebar-collapse-btn { transform: rotate(180deg); }
-        .sidebar-collapse-btn i { font-size: 14px; }
 
         .nav-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--ink-faint); font-weight: 700; padding: 4px 12px 6px; white-space: nowrap; }
         .nav-menu { display: flex; flex-direction: column; gap: 6px; }
@@ -378,7 +322,6 @@ try {
         .topbar-actions { display: flex; gap: 12px; align-items: center; }
         .icon-btn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--bg-app); border: 1px solid var(--border-soft); font-size: 19px; transition: background .2s ease, color .2s ease, transform .15s var(--ease-expo); }
         .icon-btn:hover { background: var(--coffee-light); color: var(--coffee-main); transform: translateY(-1px); }
-        .icon-btn:active { transform: scale(.92); }
         .user-profile { display: flex; align-items: center; gap: 10px; font-weight: 600; padding-left: 14px; border-left: 1px solid var(--border-soft); font-size: 14px; }
         .admin-chip { font-size: 10px; font-weight: 800; letter-spacing: .5px; padding: 3px 8px; border-radius: 20px; background: var(--coffee-light); color: var(--coffee-main); text-transform: uppercase; }
 
@@ -389,17 +332,15 @@ try {
 
         .btn-primary { background: var(--coffee-gradient); color: #fff; padding: 10px 20px; border-radius: 10px; font-weight: 700; font-size: 13.5px; box-shadow: var(--shadow-sm); display: inline-flex; align-items: center; gap: 8px; transition: transform .16s var(--ease-expo), box-shadow .2s ease; }
         .btn-primary:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
-        .btn-primary:active { transform: scale(.96); }
-        .btn-ghost { background: var(--bg-surface); border: 1px solid var(--border-soft); color: var(--coffee-main); padding: 10px 18px; border-radius: 10px; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; transition: background .2s ease, transform .15s var(--ease-expo); }
+        .btn-ghost { background: var(--bg-surface); border: 1px solid var(--border-soft); color: var(--coffee-main); padding: 10px 18px; border-radius: 10px; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; transition: background .2s ease; }
         .btn-ghost:hover { background: var(--coffee-light); }
-        .btn-ghost:active { transform: scale(.96); }
 
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; margin-bottom: 24px; }
         .kpi-card { background: var(--bg-surface); padding: 22px; border-radius: var(--radius); border: 1px solid var(--border-soft); box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 12px; transition: transform .25s var(--ease-expo), box-shadow .25s var(--ease-expo), border-color .25s ease; }
         .kpi-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--coffee-light); }
         .kpi-top { display: flex; align-items: flex-start; justify-content: space-between; }
-        .kpi-card i.kpi-icon { font-size: 22px; color: var(--coffee-main); padding: 11px; background: var(--coffee-light); border-radius: 11px; width: fit-content; }
-        .kpi-tag { font-size: 10.5px; font-weight: 800; padding: 4px 9px; border-radius: 20px; background: var(--success-bg); color: var(--success); text-transform: uppercase; letter-spacing: .3px; }
+        .kpi-card i.kpi-icon { font-size: 22px; color: var(--coffee-main); padding: 11px; background: var(--coffee-light); border-radius: 11px; }
+        .kpi-tag { font-size: 10.5px; font-weight: 800; padding: 4px 9px; border-radius: 20px; background: var(--success-bg); color: var(--success); text-transform: uppercase; }
         .kpi-val { font-family: var(--font-display); font-size: 30px; font-weight: 600; }
         .kpi-label { color: var(--ink-soft); font-size: 13px; font-weight: 600; }
 
@@ -417,34 +358,32 @@ try {
         table { width: 100%; border-collapse: collapse; text-align: left; }
         th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--ink-faint); padding-bottom: 14px; border-bottom: 1px solid var(--border-soft); font-weight: 700; }
         td { padding: 14px 0; border-bottom: 1px solid var(--border-soft); font-weight: 500; vertical-align: middle; }
-        tbody tr { transition: background .15s ease; }
         tbody tr:hover { background: var(--bg-app); }
-        tr:last-child td { border: none; }
         .badge { padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; }
         .badge.b-red { background: var(--danger-bg); color: var(--danger); }
         .badge.b-green { background: var(--success-bg); color: var(--success); }
         .badge.b-yellow { background: var(--warning-bg); color: var(--warning); }
-        .badge.b-sky { background: var(--sky-bg); color: var(--sky); }
-        .chip-btn { border: 1px solid var(--border-soft); background: var(--bg-app); color: var(--coffee-main); font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 8px; transition: background .18s ease, color .18s ease; }
+        .chip-btn { border: 1px solid var(--border-soft); background: var(--bg-app); color: var(--coffee-main); font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 8px; transition: background .18s ease; }
         .chip-btn:hover { background: var(--coffee-main); color: #fff; }
-        .icon-x { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border-soft); display: inline-grid; place-items: center; color: var(--ink-soft); transition: background .18s ease, color .18s ease; }
+        .icon-x { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border-soft); display: inline-grid; place-items: center; color: var(--ink-soft); transition: background .18s ease; }
         .icon-x:hover { background: var(--danger-bg); color: var(--danger); }
         .row-actions { display: flex; gap: 6px; align-items: center; }
 
         .form-inline { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
         .search-input, .select-input { padding: 10px 16px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--bg-app); color: var(--ink); min-width: 200px; font-family: inherit; font-size: 14px; }
+        
+        /* Modal product preview */
+        .swal-preview-img { max-width: 150px; max-height: 150px; border-radius: 8px; border: 1px solid var(--border-soft); object-fit: cover; }
 
         .stock-list { display: flex; flex-direction: column; gap: 2px; }
         .stock-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; padding: 12px 4px; border-bottom: 1px solid var(--border-soft); }
-        .stock-row:last-child { border-bottom: none; }
         .stock-thumb { width: 38px; height: 38px; border-radius: 10px; background: var(--coffee-light); display: grid; place-items: center; color: var(--coffee-main); font-size: 17px; flex: none; }
         .stock-name { font-size: 13.5px; font-weight: 700; }
         .stock-meta { font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
-        .stock-qty { text-align: right; font-weight: 700; font-size: 13px; white-space: nowrap; }
+        .stock-qty { text-align: right; font-weight: 700; font-size: 13px; }
         .stock-qty small { display: block; font-weight: 500; color: var(--ink-faint); font-size: 10.5px; }
 
         .info-strip { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 15px; margin-bottom: 15px; border-bottom: 1px solid var(--border-soft); }
-        .info-strip:last-child { border: none; margin: 0; padding: 0; }
 
         .dark-mode .swal2-popup { background: var(--bg-surface); color: var(--ink); }
         .dark-mode .swal2-input, .dark-mode .swal2-select, .dark-mode .swal2-textarea { background: var(--bg-app); color: var(--ink); border-color: var(--border-soft); }
@@ -467,20 +406,20 @@ try {
         <button class="sidebar-collapse-btn" id="btnCollapse" title="Colapsar menú"><i class="ph ph-caret-left"></i></button>
         <div class="brand">
             <i class="ph-fill ph-paw-print"></i>
-            <div class="brand-text"><div>KION</div><div class="brand-sub">Administración General</div></div>
+            <div class="brand-text"><div>KION</div><div class="brand-sub" data-i18n="brand_sub">Administración General</div></div>
         </div>
         <nav class="nav-menu">
-            <div class="nav-section-title">Panel</div>
-            <button class="nav-btn active" data-target="view-general"><i class="ph ph-squares-four"></i><span class="nav-label">Resumen General</span></button>
-            <div class="nav-section-title">Gestión</div>
-            <button class="nav-btn" data-target="view-sucursales"><i class="ph ph-storefront"></i><span class="nav-label">Sucursales</span></button>
-            <button class="nav-btn" data-target="view-personal"><i class="ph ph-users-three"></i><span class="nav-label">Personal</span></button>
-            <button class="nav-btn" data-target="view-inventario"><i class="ph ph-package"></i><span class="nav-label">Inventario</span></button>
-            <button class="nav-btn" data-target="view-productos"><i class="ph ph-tag"></i><span class="nav-label">Productos</span></button>
-            <button class="nav-btn" data-target="view-ventas"><i class="ph ph-chart-line-up"></i><span class="nav-label">Ventas</span></button>
-            <div class="nav-section-title">Navegación</div>
-            <a class="nav-btn" href="home.php"><i class="ph ph-house"></i><span class="nav-label">Volver a Home</span></a>
-            <a class="nav-btn" href="cerrarSesion.php" style="color:var(--danger)"><i class="ph ph-sign-out"></i><span class="nav-label">Cerrar sesión</span></a>
+            <div class="nav-section-title" data-i18n="nav_section_panel">Panel</div>
+            <button class="nav-btn active" data-target="view-general"><i class="ph ph-squares-four"></i><span class="nav-label" data-i18n="nav_general">Resumen General</span></button>
+            <div class="nav-section-title" data-i18n="nav_section_gestion">Gestión</div>
+            <button class="nav-btn" data-target="view-sucursales"><i class="ph ph-storefront"></i><span class="nav-label" data-i18n="nav_sucursales">Sucursales</span></button>
+            <button class="nav-btn" data-target="view-personal"><i class="ph ph-users-three"></i><span class="nav-label" data-i18n="nav_personal">Personal</span></button>
+            <button class="nav-btn" data-target="view-inventario"><i class="ph ph-package"></i><span class="nav-label" data-i18n="nav_inventario">Inventario</span></button>
+            <button class="nav-btn" data-target="view-productos"><i class="ph ph-tag"></i><span class="nav-label" data-i18n="nav_productos">Productos</span></button>
+            <button class="nav-btn" data-target="view-ventas"><i class="ph ph-chart-line-up"></i><span class="nav-label" data-i18n="nav_ventas">Ventas</span></button>
+            <div class="nav-section-title" data-i18n="nav_section_nav">Navegación</div>
+            <a class="nav-btn" href="home.php"><i class="ph ph-house"></i><span class="nav-label" data-i18n="nav_home">Volver a Home</span></a>
+            <a class="nav-btn" href="cerrarSesion.php" style="color:var(--danger)"><i class="ph ph-sign-out"></i><span class="nav-label" data-i18n="nav_logout">Cerrar sesión</span></a>
         </nav>
     </aside>
     <div class="sidebar-scrim" id="sidebarScrim"></div>
@@ -490,16 +429,17 @@ try {
             <div style="display:flex; align-items:center; gap:14px;">
                 <button class="hamburger-btn" id="btnMobileMenu"><i class="ph ph-list"></i></button>
                 <div class="topbar-title-block">
-                    <div class="eyebrow">Panel principal</div>
-                    <div class="title-main" id="topbarTitle">Resumen General</div>
+                    <div class="eyebrow" data-i18n="eyebrow_panel">Panel principal</div>
+                    <div class="title-main" id="topbarTitle" data-i18n="nav_general">Resumen General</div>
                 </div>
             </div>
             <div class="topbar-actions">
+                <button class="icon-btn" id="btnLang" title="Switch language / Cambiar idioma"><i class="ph ph-translate"></i></button>
                 <button class="icon-btn" id="btnTheme" title="Modo Oscuro"><i class="ph ph-moon"></i></button>
                 <div class="user-profile">
                     <i class="ph-fill ph-user-circle" style="font-size:24px; color:var(--coffee-main)"></i>
                     <span><?= htmlspecialchars($nombreAdmin) ?></span>
-                    <span class="admin-chip">Admin</span>
+                    <span class="admin-chip" data-i18n="role_chip">Admin</span>
                 </div>
             </div>
         </header>
@@ -509,25 +449,25 @@ try {
             <!-- RESUMEN GENERAL -->
             <section id="view-general" class="view-section active">
                 <div class="header-row">
-                    <div><h1 class="title">Hola, administración <span class="wave">👋</span></h1><p class="subtitle">Este es el pulso operativo de KION al día de hoy.</p></div>
-                    <button class="btn-ghost" id="refreshDashboard"><i class="ph ph-arrows-clockwise"></i> Actualizar</button>
+                    <div><h1 class="title"><span data-i18n="greeting">Hola, administración</span> <span class="wave">👋</span></h1><p class="subtitle" data-i18n="greeting_sub">Este es el pulso operativo de KION al día de hoy.</p></div>
+                    <button class="btn-ghost" id="refreshDashboard"><i class="ph ph-arrows-clockwise"></i> <span data-i18n="btn_actualizar">Actualizar</span></button>
                 </div>
                 <div class="kpi-grid">
-                    <div class="kpi-card"><div class="kpi-top"><i class="ph-fill ph-storefront kpi-icon"></i><span class="kpi-tag">Red</span></div><div class="kpi-val" id="metricSucursales"><?= number_format($ts) ?></div><div class="kpi-label">Sucursales</div></div>
-                    <div class="kpi-card"><div class="kpi-top"><i class="ph-fill ph-users-three kpi-icon"></i><span class="kpi-tag">Equipo</span></div><div class="kpi-val" id="metricUsuarios"><?= number_format($tu) ?></div><div class="kpi-label">Personal</div></div>
-                    <div class="kpi-card"><div class="kpi-top"><i class="ph-fill ph-package kpi-icon"></i><span class="kpi-tag">Catálogo</span></div><div class="kpi-val" id="metricProductos"><?= number_format($tp) ?></div><div class="kpi-label">Productos</div></div>
-                    <div class="kpi-card"><div class="kpi-top"><i class="ph-fill ph-money kpi-icon"></i><span class="kpi-tag">Hoy</span></div><div class="kpi-val" id="metricIngresos">$<?= number_format($ih, 2) ?></div><div class="kpi-label" id="metricVentasCount"><?= number_format($vh) ?> ventas realizadas</div></div>
+                    <div class="kpi-card"><div class="kpi-top"><i class="ph-fill ph-storefront kpi-icon"></i><span class="kpi-tag" data-i18n="kpi_tag_red">Red</span></div><div class="kpi-val" id="metricSucursales"><?= number_format($ts) ?></div><div class="kpi-label" data-i18n="th_sucursales">Sucursales</div></div>
+                    <div class="kpi-card"><div class="kpi-top"><i class="ph-fill ph-users-three kpi-icon"></i><span class="kpi-tag" data-i18n="kpi_tag_equipo">Equipo</span></div><div class="kpi-val" id="metricUsuarios"><?= number_format($tu) ?></div><div class="kpi-label" data-i18n="nav_personal">Personal</div></div>
+                    <div class="kpi-card"><div class="kpi-top"><i class="ph-fill ph-package kpi-icon"></i><span class="kpi-tag" data-i18n="kpi_tag_catalogo">Catálogo</span></div><div class="kpi-val" id="metricProductos"><?= number_format($tp) ?></div><div class="kpi-label" data-i18n="nav_productos">Productos</div></div>
+                    <div class="kpi-card"><div class="kpi-top"><i class="ph-fill ph-money kpi-icon"></i><span class="kpi-tag" data-i18n="kpi_tag_hoy">Hoy</span></div><div class="kpi-val" id="metricIngresos">$<?= number_format($ih, 2) ?></div><div class="kpi-label" id="metricVentasCount"><?= number_format($vh) ?> <span data-i18n="ventas_realizadas">ventas realizadas</span></div></div>
                 </div>
                 <div class="grid-2col">
-                    <div class="panel"><div class="panel-head"><div><h2 class="panel-title">Ventas (7 días)</h2><p class="panel-sub">Ingresos consolidados de toda la red</p></div></div><div class="chart-box"><canvas id="salesChart"></canvas></div></div>
-                    <div class="panel"><div class="panel-head"><div><h2 class="panel-title">Métodos de pago</h2><p class="panel-sub">Distribución histórica</p></div></div><div class="donut-wrap"><canvas id="paymentChart"></canvas><div class="donut-center"><div class="num" id="donutVentasCount"><?= number_format($vh) ?></div><div class="lbl">ventas</div></div></div></div>
+                    <div class="panel"><div class="panel-head"><div><h2 class="panel-title" data-i18n="chart_ventas">Ventas (7 días)</h2><p class="panel-sub" data-i18n="chart_ventas_sub">Ingresos consolidados de toda la red</p></div></div><div class="chart-box"><canvas id="salesChart"></canvas></div></div>
+                    <div class="panel"><div class="panel-head"><div><h2 class="panel-title" data-i18n="chart_pagos">Métodos de pago</h2><p class="panel-sub" data-i18n="chart_pagos_sub">Distribución histórica</p></div></div><div class="donut-wrap"><canvas id="paymentChart"></canvas><div class="donut-center"><div class="num" id="donutVentasCount"><?= number_format($vh) ?></div><div class="lbl" data-i18n="ventas_lbl">ventas</div></div></div></div>
                 </div>
                 <div class="grid-2col">
-                    <div class="panel"><div class="panel-head"><div><h2 class="panel-title">Atención pendiente</h2><p class="panel-sub">Productos bajos o agotados</p></div><button class="chip-btn" data-goto="view-inventario">Ir al inventario</button></div><div id="lowStockList" class="stock-list">Cargando...</div></div>
+                    <div class="panel"><div class="panel-head"><div><h2 class="panel-title" data-i18n="atencion_title">Atención pendiente</h2><p class="panel-sub" data-i18n="atencion_sub">Productos bajos o agotados</p></div><button class="chip-btn" data-goto="view-inventario" data-i18n="ir_inventario">Ir al inventario</button></div><div id="lowStockList" class="stock-list" data-i18n="cargando">Cargando...</div></div>
                     <div class="panel">
-                        <div class="panel-head"><div><h2 class="panel-title">Salud del Inventario</h2><p class="panel-sub">Métricas globales de mercancía</p></div></div>
-                        <div class="info-strip"><div><div class="kpi-label">Total de Unidades Físicas</div><div class="kpi-val" style="font-size:22px; margin-top:4px;" id="metricInventarioTotal"><?= number_format($ti) ?></div></div><i class="ph-fill ph-cube kpi-icon"></i></div>
-                        <div class="info-strip"><div><div class="kpi-label">Valor Estimado (Precio Venta)</div><div class="kpi-val" style="font-size:22px; margin-top:4px; color:var(--success);" id="metricValorInventario">$<?= number_format($valor_inv, 2) ?></div></div><i class="ph-fill ph-chart-pie-slice kpi-icon"></i></div>
+                        <div class="panel-head"><div><h2 class="panel-title" data-i18n="salud_inv_title">Salud del Inventario</h2><p class="panel-sub" data-i18n="salud_inv_sub">Métricas globales de mercancía</p></div></div>
+                        <div class="info-strip"><div><div class="kpi-label" data-i18n="total_unidades">Total de Unidades Físicas</div><div class="kpi-val" style="font-size:22px; margin-top:4px;" id="metricInventarioTotal"><?= number_format($ti) ?></div></div><i class="ph-fill ph-cube kpi-icon"></i></div>
+                        <div class="info-strip"><div><div class="kpi-label" data-i18n="valor_estimado">Valor Estimado (Precio Venta)</div><div class="kpi-val" style="font-size:22px; margin-top:4px; color:var(--success);" id="metricValorInventario">$<?= number_format($valor_inv, 2) ?></div></div><i class="ph-fill ph-chart-pie-slice kpi-icon"></i></div>
                     </div>
                 </div>
             </section>
@@ -535,54 +475,54 @@ try {
             <!-- SUCURSALES -->
             <section id="view-sucursales" class="view-section">
                 <div class="header-row">
-                    <div><h1 class="title"><i class="ph ph-storefront"></i> Sucursales</h1><p class="subtitle">Crea, consulta, modifica y elimina puntos de venta.</p></div>
-                    <button class="btn-primary" id="addSucursal"><i class="ph ph-plus"></i> Agregar sucursal</button>
+                    <div><h1 class="title"><i class="ph ph-storefront"></i> <span data-i18n="nav_sucursales">Sucursales</span></h1><p class="subtitle" data-i18n="suc_sub">Crea, consulta, modifica y elimina puntos de venta.</p></div>
+                    <button class="btn-primary" id="addSucursal"><i class="ph ph-plus"></i> <span data-i18n="btn_add_sucursal">Agregar sucursal</span></button>
                 </div>
-                <div class="panel"><table><thead><tr><th>Sucursal</th><th>Dirección</th><th>Teléfono</th><th>Contacto</th><th>Estado</th><th></th></tr></thead><tbody id="sucursalesTable"></tbody></table></div>
+                <div class="panel"><table><thead><tr><th data-i18n="th_sucursal">Sucursal</th><th data-i18n="th_direccion">Dirección</th><th data-i18n="th_telefono">Teléfono</th><th data-i18n="th_contacto">Contacto</th><th data-i18n="th_estado">Estado</th><th></th></tr></thead><tbody id="sucursalesTable"></tbody></table></div>
             </section>
 
             <!-- PERSONAL -->
             <section id="view-personal" class="view-section">
                 <div class="header-row">
-                    <div><h1 class="title"><i class="ph ph-users-three"></i> Personal</h1><p class="subtitle">Registra gerentes/cajeros y asígnalos a una sucursal.</p></div>
-                    <button class="btn-primary" id="addPersonal"><i class="ph ph-plus"></i> Agregar personal</button>
+                    <div><h1 class="title"><i class="ph ph-users-three"></i> <span data-i18n="nav_personal">Personal</span></h1><p class="subtitle" data-i18n="per_sub">Registra gerentes/cajeros y asígnalos a una sucursal.</p></div>
+                    <button class="btn-primary" id="addPersonal"><i class="ph ph-plus"></i> <span data-i18n="btn_add_personal">Agregar personal</span></button>
                 </div>
-                <div class="panel"><table><thead><tr><th>Personal</th><th>Rol</th><th>Sucursal</th><th>Estado</th><th></th></tr></thead><tbody id="personalTable"></tbody></table></div>
+                <div class="panel"><table><thead><tr><th data-i18n="nav_personal">Personal</th><th data-i18n="th_rol">Rol</th><th data-i18n="th_sucursal">Sucursal</th><th data-i18n="th_estado">Estado</th><th></th></tr></thead><tbody id="personalTable"></tbody></table></div>
             </section>
 
             <!-- INVENTARIO -->
             <section id="view-inventario" class="view-section">
-                <div class="header-row"><div><h1 class="title"><i class="ph ph-package"></i> Inventario</h1><p class="subtitle">Consulta las existencias de todas las sucursales.</p></div></div>
+                <div class="header-row"><div><h1 class="title"><i class="ph ph-package"></i> <span data-i18n="nav_inventario">Inventario</span></h1><p class="subtitle" data-i18n="inv_sub">Consulta las existencias de todas las sucursales.</p></div></div>
                 <div class="panel">
                     <div class="form-inline" style="margin-bottom:16px;">
-                        <input class="search-input" id="inventorySearch" type="search" placeholder="Producto o código...">
-                        <select class="select-input" id="inventoryBranch"><option value="">Todas las sucursales</option></select>
+                        <input class="search-input" id="inventorySearch" type="search" data-i18n-placeholder="placeholder_buscar_producto" placeholder="Producto o código...">
+                        <select class="select-input" id="inventoryBranch"><option value="" data-i18n="todas_sucursales">Todas las sucursales</option></select>
                     </div>
-                    <table><thead><tr><th>Producto</th><th>Sucursal</th><th>Existencia</th><th>Precio</th><th>Nivel</th></tr></thead><tbody id="inventarioTable"></tbody></table>
+                    <table><thead><tr><th data-i18n="th_producto">Producto</th><th data-i18n="th_sucursal">Sucursal</th><th data-i18n="th_existencia">Existencia</th><th data-i18n="th_precio">Precio</th><th data-i18n="th_nivel">Nivel</th></tr></thead><tbody id="inventarioTable"></tbody></table>
                 </div>
             </section>
 
             <!-- PRODUCTOS -->
             <section id="view-productos" class="view-section">
                 <div class="header-row">
-                    <div><h1 class="title"><i class="ph ph-tag"></i> Catálogo Global</h1><p class="subtitle">Registra los productos base de todo el sistema.</p></div>
-                    <button class="btn-primary" id="addProducto"><i class="ph ph-plus"></i> Agregar producto</button>
+                    <div><h1 class="title"><i class="ph ph-tag"></i> <span data-i18n="prod_title">Catálogo Global</span></h1><p class="subtitle" data-i18n="prod_sub">Registra los productos base de todo el sistema.</p></div>
+                    <button class="btn-primary" id="addProducto"><i class="ph ph-plus"></i> <span data-i18n="btn_add_producto">Agregar producto</span></button>
                 </div>
                 <div class="panel">
-                    <div class="form-inline" style="margin-bottom:16px;"><input class="search-input" id="productsSearch" type="search" placeholder="Buscar producto o código..."></div>
-                    <table><thead><tr><th>Código</th><th>Producto</th><th>Categoría</th><th>Precio</th><th>Estado</th><th></th></tr></thead><tbody id="productosTable"></tbody></table>
+                    <div class="form-inline" style="margin-bottom:16px;"><input class="search-input" id="productsSearch" type="search" data-i18n-placeholder="placeholder_buscar_producto" placeholder="Buscar producto o código..."></div>
+                    <table><thead><tr><th data-i18n="th_codigo">Código</th><th data-i18n="th_producto">Producto</th><th data-i18n="th_categoria">Categoría</th><th data-i18n="th_precio">Precio</th><th data-i18n="th_estado">Estado</th><th></th></tr></thead><tbody id="productosTable"></tbody></table>
                 </div>
             </section>
 
             <!-- VENTAS -->
             <section id="view-ventas" class="view-section">
-                <div class="header-row"><div><h1 class="title"><i class="ph ph-chart-line-up"></i> Historial de Ventas</h1><p class="subtitle">Supervisa las ventas de toda la red.</p></div></div>
+                <div class="header-row"><div><h1 class="title"><i class="ph ph-chart-line-up"></i> <span data-i18n="ven_title">Historial de Ventas</span></h1><p class="subtitle" data-i18n="ven_sub">Supervisa las ventas de toda la red.</p></div></div>
                 <div class="panel">
                     <div class="form-inline" style="margin-bottom:16px;">
-                        <select class="select-input" id="salesBranch"><option value="">Todas las sucursales</option></select>
+                        <select class="select-input" id="salesBranch"><option value="" data-i18n="todas_sucursales">Todas las sucursales</option></select>
                         <input class="search-input" id="salesFrom" type="date"><input class="search-input" id="salesTo" type="date">
                     </div>
-                    <table><thead><tr><th>Folio</th><th>Fecha</th><th>Sucursal</th><th>Personal</th><th>Pago</th><th>Total</th><th>Estado</th><th></th></tr></thead><tbody id="ventasTable"></tbody></table>
+                    <table><thead><tr><th data-i18n="th_folio">Folio</th><th data-i18n="th_fecha">Fecha</th><th data-i18n="th_sucursal">Sucursal</th><th data-i18n="nav_personal">Personal</th><th data-i18n="th_pago">Pago</th><th data-i18n="th_total">Total</th><th data-i18n="th_estado">Estado</th><th></th></tr></thead><tbody id="ventasTable"></tbody></table>
                 </div>
             </section>
 
@@ -601,12 +541,12 @@ async function request(actionStr, options = {}) {
     const r = await fetch(`${endpoint}?action=${actionStr}`, options);
     const text = await r.text();
     let data;
-    try { data = JSON.parse(text); } catch(e) { console.error(text); throw new Error('[ERROR DE SISTEMA] Falló la lectura de la respuesta del servidor.'); }
+    try { data = JSON.parse(text); } catch(e) { throw new Error('[ERROR DE SISTEMA] Falló la lectura de la respuesta del servidor.'); }
     if (!data.ok) throw new Error(data.msg || 'No fue posible completar la operación.');
     return data;
 }
 const statusBadge = s => `<span class="badge ${String(s).toUpperCase().includes('INACT') ? 'b-red' : 'b-green'}">${escapeHtml(s)}</span>`;
-const empty = (cols, text='No hay registros.') => `<tr><td colspan="${cols}" style="text-align:center;color:var(--ink-faint);padding:30px">${text}</td></tr>`;
+const empty = (cols, text=null) => `<tr><td colspan="${cols}" style="text-align:center;color:var(--ink-faint);padding:30px">${text || t('sin_registros')}</td></tr>`;
 
 // -------- TEMA --------
 const body = document.body, btnTheme = $('#btnTheme');
@@ -618,23 +558,93 @@ btnTheme.addEventListener('click', () => {
 });
 if (localStorage.getItem('kion-admin-theme') === 'dark') { body.classList.add('dark-mode'); btnTheme.querySelector('i').classList.replace('ph-moon','ph-sun'); }
 
-// -------- SIDEBAR: colapsar / móvil --------
+// -------- IDIOMA (ES / EN) --------
+const I18N = {
+    es: {
+        brand_sub: 'Administración General', role_chip: 'Admin', eyebrow_panel: 'Panel principal',
+        nav_section_panel: 'Panel', nav_section_gestion: 'Gestión', nav_section_nav: 'Navegación',
+        nav_general: 'Resumen General', nav_sucursales: 'Sucursales', nav_personal: 'Personal', nav_inventario: 'Inventario',
+        nav_productos: 'Productos', nav_ventas: 'Ventas', nav_home: 'Volver a Home', nav_logout: 'Cerrar sesión',
+        greeting: 'Hola, administración', greeting_sub: 'Este es el pulso operativo de KION al día de hoy.', btn_actualizar: 'Actualizar',
+        kpi_tag_red: 'Red', kpi_tag_equipo: 'Equipo', kpi_tag_catalogo: 'Catálogo', kpi_tag_hoy: 'Hoy', ventas_realizadas: 'ventas realizadas', ventas_lbl: 'ventas',
+        th_sucursales: 'Sucursales', chart_ventas: 'Ventas (7 días)', chart_ventas_sub: 'Ingresos consolidados de toda la red',
+        chart_pagos: 'Métodos de pago', chart_pagos_sub: 'Distribución histórica',
+        atencion_title: 'Atención pendiente', atencion_sub: 'Productos bajos o agotados', ir_inventario: 'Ir al inventario', cargando: 'Cargando...',
+        salud_inv_title: 'Salud del Inventario', salud_inv_sub: 'Métricas globales de mercancía',
+        total_unidades: 'Total de Unidades Físicas', valor_estimado: 'Valor Estimado (Precio Venta)',
+        suc_sub: 'Crea, consulta, modifica y elimina puntos de venta.', btn_add_sucursal: 'Agregar sucursal',
+        th_sucursal: 'Sucursal', th_direccion: 'Dirección', th_telefono: 'Teléfono', th_contacto: 'Contacto', th_estado: 'Estado',
+        per_sub: 'Registra gerentes/cajeros y asígnalos a una sucursal.', btn_add_personal: 'Agregar personal', th_rol: 'Rol',
+        inv_sub: 'Consulta las existencias de todas las sucursales.', placeholder_buscar_producto: 'Buscar producto o código...',
+        todas_sucursales: 'Todas las sucursales', th_producto: 'Producto', th_existencia: 'Existencia', th_precio: 'Precio', th_nivel: 'Nivel',
+        prod_title: 'Catálogo Global', prod_sub: 'Registra los productos base de todo el sistema.', btn_add_producto: 'Agregar producto',
+        th_codigo: 'Código', th_categoria: 'Categoría',
+        ven_title: 'Historial de Ventas', ven_sub: 'Supervisa las ventas de toda la red.',
+        th_folio: 'Folio', th_fecha: 'Fecha', th_pago: 'Pago', th_total: 'Total',
+        editar: 'Editar', ver_stock: 'Ver stock', ver: 'Ver', guardar: 'Guardar', cancelar: 'Cancelar', si_eliminar: 'Sí, eliminar',
+        sin_registros: 'No hay registros.', panel_actualizado: 'Panel actualizado.', inv_saludable: 'Todo el inventario está en niveles saludables.',
+        sin_datos: 'Sin datos.', no_asignado: 'No está asignado a ninguna sucursal.',
+        modal_prod_new: 'Nuevo Producto', modal_prod_edit: 'Editar Producto', img_url: 'URL de Imagen', desc_lbl: 'Descripción', asign_suc: 'Asignar a sucursales:'
+    },
+    en: {
+        brand_sub: 'General Administration', role_chip: 'Admin', eyebrow_panel: 'Main panel',
+        nav_section_panel: 'Overview', nav_section_gestion: 'Management', nav_section_nav: 'Navigation',
+        nav_general: 'Dashboard', nav_sucursales: 'Branches', nav_personal: 'Staff', nav_inventario: 'Inventory',
+        nav_productos: 'Products', nav_ventas: 'Sales', nav_home: 'Back to Home', nav_logout: 'Log out',
+        greeting: 'Hello, admin', greeting_sub: "Here's KION's operating pulse for today.", btn_actualizar: 'Refresh',
+        kpi_tag_red: 'Network', kpi_tag_equipo: 'Team', kpi_tag_catalogo: 'Catalog', kpi_tag_hoy: 'Today', ventas_realizadas: 'sales made', ventas_lbl: 'sales',
+        th_sucursales: 'Branches', chart_ventas: 'Sales (7 days)', chart_ventas_sub: 'Consolidated revenue across the network',
+        chart_pagos: 'Payment methods', chart_pagos_sub: 'Historical distribution',
+        atencion_title: 'Needs attention', atencion_sub: 'Low or out-of-stock products', ir_inventario: 'Go to inventory', cargando: 'Loading...',
+        salud_inv_title: 'Inventory Health', salud_inv_sub: 'Global merchandise metrics',
+        total_unidades: 'Total Physical Units', valor_estimado: 'Estimated Value (Sale Price)',
+        suc_sub: 'Create, view, edit and delete store branches.', btn_add_sucursal: 'Add branch',
+        th_sucursal: 'Branch', th_direccion: 'Address', th_telefono: 'Phone', th_contacto: 'Contact', th_estado: 'Status',
+        per_sub: 'Register managers/cashiers and assign them to a branch.', btn_add_personal: 'Add staff', th_rol: 'Role',
+        inv_sub: 'Check stock levels across all branches.', placeholder_buscar_producto: 'Search product or code...',
+        todas_sucursales: 'All branches', th_producto: 'Product', th_existencia: 'Stock', th_precio: 'Price', th_nivel: 'Level',
+        prod_title: 'Global Catalog', prod_sub: 'Register the base products for the whole system.', btn_add_producto: 'Add product',
+        th_codigo: 'Code', th_categoria: 'Category',
+        ven_title: 'Sales History', ven_sub: 'Monitor sales across the whole network.',
+        th_folio: 'ID', th_fecha: 'Date', th_pago: 'Payment', th_total: 'Total',
+        editar: 'Edit', ver_stock: 'View stock', ver: 'View', guardar: 'Save', cancelar: 'Cancel', si_eliminar: 'Yes, delete',
+        sin_registros: 'No records.', panel_actualizado: 'Dashboard refreshed.', inv_saludable: 'All inventory is at healthy levels.',
+        sin_datos: 'No data.', no_asignado: 'Not assigned to any branch.',
+        modal_prod_new: 'New Product', modal_prod_edit: 'Edit Product', img_url: 'Image URL', desc_lbl: 'Description', asign_suc: 'Assign to branches:'
+    }
+};
+let currentLang = localStorage.getItem('kion-admin-lang') || 'es';
+function t(key) { return (I18N[currentLang] && I18N[currentLang][key]) || I18N.es[key] || key; }
+function applyLanguage() {
+    document.documentElement.lang = currentLang;
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+}
+$('#btnLang').addEventListener('click', () => {
+    currentLang = currentLang === 'es' ? 'en' : 'es';
+    localStorage.setItem('kion-admin-lang', currentLang);
+    applyLanguage();
+    const activeView = document.querySelector('.view-section.active');
+    if (activeView) switchView(activeView.id);
+});
+applyLanguage();
+
+// -------- SIDEBAR --------
 const appLayout = $('#appLayout');
 $('#btnCollapse').addEventListener('click', () => appLayout.classList.toggle('is-collapsed'));
 $('#btnMobileMenu').addEventListener('click', () => appLayout.classList.add('mobile-open'));
 $('#sidebarScrim').addEventListener('click', () => appLayout.classList.remove('mobile-open'));
 
-// -------- NAVEGACIÓN --------
 const navButtons = document.querySelectorAll('.nav-btn[data-target]');
 const views = document.querySelectorAll('.view-section');
-const titles = { 'view-general':'Resumen General', 'view-sucursales':'Sucursales', 'view-personal':'Personal', 'view-inventario':'Inventario', 'view-productos':'Catálogo Global', 'view-ventas':'Historial de Ventas' };
+const titleKeys = { 'view-general':'nav_general', 'view-sucursales':'nav_sucursales', 'view-personal':'nav_personal', 'view-inventario':'nav_inventario', 'view-productos':'prod_title', 'view-ventas':'ven_title' };
 function switchView(targetId) {
     views.forEach(v => v.classList.remove('active'));
     navButtons.forEach(b => b.classList.remove('active'));
     document.getElementById(targetId).classList.add('active');
     const btn = document.querySelector(`.nav-btn[data-target="${targetId}"]`);
     if (btn) btn.classList.add('active');
-    $('#topbarTitle').textContent = titles[targetId] || 'Panel';
+    $('#topbarTitle').textContent = t(titleKeys[targetId] || 'nav_general');
     appLayout.classList.remove('mobile-open');
     if (targetId === 'view-general') loadDashboard();
     if (targetId === 'view-sucursales') loadSucursales();
@@ -655,21 +665,21 @@ async function loadDashboard() {
         $('#metricUsuarios').textContent = Number(data.tu).toLocaleString();
         $('#metricProductos').textContent = Number(data.tp).toLocaleString();
         $('#metricIngresos').textContent = money(data.ih);
-        $('#metricVentasCount').textContent = Number(data.vh).toLocaleString() + ' ventas realizadas';
+        $('#metricVentasCount').textContent = Number(data.vh).toLocaleString() + ' ' + t('ventas_lbl');
         $('#donutVentasCount').textContent = Number(data.vh).toLocaleString();
         $('#metricInventarioTotal').textContent = Number(data.ti).toLocaleString();
         $('#metricValorInventario').textContent = money(data.valor_inv);
-    } catch (e) { notify(e.message, 'error'); }
+    } catch (e) {}
     loadLowStock();
 }
 async function loadLowStock() {
     try {
         const { data } = await request('get_inventarios');
         const low = data.filter(x => x.nivel !== 'OK').slice(0, 5);
-        $('#lowStockList').innerHTML = low.length ? low.map(x => `<div class="stock-row"><span class="stock-thumb"><i class="ph ph-package"></i></span><div><div class="stock-name">${escapeHtml(x.producto)}</div><div class="stock-meta">${escapeHtml(x.sucursal)}</div></div><div class="stock-qty">${escapeHtml(x.existencias)}<small>mín. ${escapeHtml(x.stock_minimo)}</small></div></div>`).join('') : `<p class="subtitle" style="font-size:13px; padding:10px 0;">Todo el inventario está en niveles saludables.</p>`;
+        $('#lowStockList').innerHTML = low.length ? low.map(x => `<div class="stock-row"><span class="stock-thumb"><i class="ph ph-package"></i></span><div><div class="stock-name">${escapeHtml(x.producto)}</div><div class="stock-meta">${escapeHtml(x.sucursal)}</div></div><div class="stock-qty">${escapeHtml(x.existencias)}<small>mín. ${escapeHtml(x.stock_minimo)}</small></div></div>`).join('') : `<p class="subtitle" style="font-size:13px; padding:10px 0;">${t('inv_saludable')}</p>`;
     } catch (e) {}
 }
-$('#refreshDashboard').addEventListener('click', () => { loadDashboard(); notify('Panel actualizado.'); });
+$('#refreshDashboard').addEventListener('click', () => { loadDashboard(); notify(t('panel_actualizado')); });
 
 // -------- SUCURSALES --------
 async function loadSucursales() {
@@ -678,25 +688,26 @@ async function loadSucursales() {
         $('#sucursalesTable').innerHTML = data.length ? data.map(x => `<tr>
             <td><b>${escapeHtml(x.nombre)}</b></td><td>${escapeHtml(x.direccion||'-')}</td><td>${escapeHtml(x.telefono||'-')}</td><td>${escapeHtml(x.contacto||'-')}</td>
             <td>${statusBadge(x.estado)}</td>
-            <td class="row-actions"><button class="chip-btn" data-edit-suc='${JSON.stringify(x).replace(/'/g,'&#39;')}'>Editar</button><button class="icon-x" data-del-suc="${x.id_sucursal}"><i class="ph ph-trash"></i></button></td>
+            <td class="row-actions"><button class="chip-btn" data-edit-suc='${JSON.stringify(x).replace(/'/g,'&#39;')}'>${t('editar')}</button><button class="icon-x" data-del-suc="${x.id_sucursal}"><i class="ph ph-trash"></i></button></td>
         </tr>`).join('') : empty(6);
     } catch (e) { notify(e.message, 'error'); }
 }
 async function sucursalModal(record = null) {
     const editing = !!record;
+    const L = currentLang === 'en' ? { titleNew:'New Branch', titleEdit:'Edit Branch', nombre:'Name *', dir:'Address', tel:'Phone', cont:'Contact', estado:'Status', required:'Name is required.' } : { titleNew:'Nueva Sucursal', titleEdit:'Editar Sucursal', nombre:'Nombre *', dir:'Dirección', tel:'Teléfono', cont:'Contacto', estado:'Estado', required:'El nombre es obligatorio.' };
     const { value: form } = await Swal.fire({
-        title: editing ? 'Editar Sucursal' : 'Nueva Sucursal',
+        title: editing ? L.titleEdit : L.titleNew,
         html: `<div style="text-align:left;">
-            <label><b>Nombre *</b></label><input id="swal-nombre" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.nombre):''}">
-            <label><b>Dirección</b></label><input id="swal-dir" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.direccion||''):''}">
-            <label><b>Teléfono</b></label><input id="swal-tel" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.telefono||''):''}">
-            <label><b>Contacto</b></label><input id="swal-cont" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.contacto||''):''}">
-            ${editing ? `<label><b>Estado</b></label><select id="swal-estado" class="swal2-input" style="width:100%;margin:6px 0;"><option ${record.estado==='ACTIVA'?'selected':''}>ACTIVA</option><option ${record.estado==='INACTIVA'?'selected':''}>INACTIVA</option></select>` : ''}
+            <label><b>${L.nombre}</b></label><input id="swal-nombre" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.nombre):''}">
+            <label><b>${L.dir}</b></label><input id="swal-dir" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.direccion||''):''}">
+            <label><b>${L.tel}</b></label><input id="swal-tel" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.telefono||''):''}">
+            <label><b>${L.cont}</b></label><input id="swal-cont" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.contacto||''):''}">
+            ${editing ? `<label><b>${L.estado}</b></label><select id="swal-estado" class="swal2-input" style="width:100%;margin:6px 0;"><option ${record.estado==='ACTIVA'?'selected':''}>ACTIVA</option><option${record.estado==='INACTIVA'?'selected':''}>INACTIVA</option></select>` : ''}
         </div>`,
-        confirmButtonText: 'Guardar', confirmButtonColor: 'var(--coffee-main)', showCancelButton: true, cancelButtonText: 'Cancelar',
+        confirmButtonText: t('guardar'), confirmButtonColor: 'var(--coffee-main)', showCancelButton: true, cancelButtonText: t('cancelar'),
         preConfirm: () => {
             const nombre = document.getElementById('swal-nombre').value.trim();
-            if (!nombre) { Swal.showValidationMessage('El nombre es obligatorio.'); return false; }
+            if (!nombre) { Swal.showValidationMessage(L.required); return false; }
             const out = { nombre, direccion: document.getElementById('swal-dir').value, telefono: document.getElementById('swal-tel').value, contacto: document.getElementById('swal-cont').value };
             if (editing) { out.id = record.id_sucursal; out.estado = document.getElementById('swal-estado').value; }
             return out;
@@ -715,7 +726,8 @@ document.addEventListener('click', async e => {
     if (editBtn) sucursalModal(JSON.parse(editBtn.dataset.editSuc));
     const delBtn = e.target.closest('[data-del-suc]');
     if (delBtn) {
-        const conf = await Swal.fire({ title:'¿Eliminar sucursal?', text:'Esta acción no se puede deshacer.', icon:'warning', showCancelButton:true, confirmButtonColor:'var(--danger)', confirmButtonText:'Sí, eliminar', cancelButtonText:'Cancelar' });
+        const Ld = currentLang === 'en' ? { title:'Delete branch?', text:'This action cannot be undone.' } : { title:'¿Eliminar sucursal?', text:'Esta acción no se puede deshacer.' };
+        const conf = await Swal.fire({ title:Ld.title, text:Ld.text, icon:'warning', showCancelButton:true, confirmButtonColor:'var(--danger)', confirmButtonText:t('si_eliminar'), cancelButtonText:t('cancelar') });
         if (!conf.isConfirmed) return;
         try {
             const fd = new FormData(); fd.append('id', delBtn.dataset.delSuc);
@@ -732,7 +744,7 @@ async function loadPersonal() {
         $('#personalTable').innerHTML = data.length ? data.map(x => `<tr>
             <td><b>${escapeHtml(x.nombre)} ${escapeHtml(x.apellido||'')}</b><br><small style="color:var(--ink-faint)">${escapeHtml(x.correo)}</small></td>
             <td>${escapeHtml(x.rol||'-')}</td><td>${escapeHtml(x.sucursal)}</td><td>${statusBadge(x.estado)}</td>
-            <td class="row-actions"><button class="chip-btn" data-edit-per='${JSON.stringify(x).replace(/'/g,'&#39;')}'>Editar</button><button class="icon-x" data-del-per="${x.id_usuario}"><i class="ph ph-trash"></i></button></td>
+            <td class="row-actions"><button class="chip-btn" data-edit-per='${JSON.stringify(x).replace(/'/g,'&#39;')}'>${t('editar')}</button><button class="icon-x" data-del-per="${x.id_usuario}"><i class="ph ph-trash"></i></button></td>
         </tr>`).join('') : empty(5);
     } catch (e) { notify(e.message, 'error'); }
 }
@@ -741,24 +753,25 @@ async function personalModal(record = null) {
     let roles = [], sucursales = [];
     try { [roles, sucursales] = await Promise.all([request('get_roles'), request('get_sucursales_simple')]); } catch(e) { notify(e.message,'error'); return; }
     const roleOptions = roles.data.map(r => `<option value="${r.id_rol}" ${editing && +record.id_rol===+r.id_rol?'selected':''}>${escapeHtml(r.nombre)}</option>`).join('');
-    const branchOptions = '<option value="">-- Sin sucursal (solo Admin) --</option>' + sucursales.data.map(s => `<option value="${s.id_sucursal}" ${editing && +record.id_sucursal===+s.id_sucursal?'selected':''}>${escapeHtml(s.nombre)}</option>`).join('');
+    const Lp = currentLang === 'en' ? { titleNew:'New Staff', titleEdit:'Edit Staff', noBranch:'-- No branch (Admin only) --', nombre:'Name *', apellido:'Last name', correo:'Email *', rol:'Role *', suc:'Branch', pass:'Password', passEdit:'(leave empty to keep it)', estado:'Status', required:'Name and email are required.' } : { titleNew:'Nuevo Personal', titleEdit:'Editar Personal', noBranch:'-- Sin sucursal (solo Admin) --', nombre:'Nombre *', apellido:'Apellido', correo:'Correo *', rol:'Rol *', suc:'Sucursal', pass:'Contraseña', passEdit:'(dejar vacío para no cambiar)', estado:'Estado', required:'Nombre y correo son obligatorios.' };
+    const branchOptions = `<option value="">${Lp.noBranch}</option>` + sucursales.data.map(s => `<option value="${s.id_sucursal}" ${editing && +record.id_sucursal===+s.id_sucursal?'selected':''}>${escapeHtml(s.nombre)}</option>`).join('');
 
     const { value: form } = await Swal.fire({
-        title: editing ? 'Editar Personal' : 'Nuevo Personal',
+        title: editing ? Lp.titleEdit : Lp.titleNew,
         html: `<div style="text-align:left;">
-            <label><b>Nombre *</b></label><input id="swal-nom" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.nombre):''}">
-            <label><b>Apellido</b></label><input id="swal-ape" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.apellido||''):''}">
-            <label><b>Correo *</b></label><input id="swal-correo" type="email" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.correo):''}">
-            <label><b>Rol *</b></label><select id="swal-rol" class="swal2-input" style="width:100%;margin:6px 0 12px;">${roleOptions}</select>
-            <label><b>Sucursal</b></label><select id="swal-suc" class="swal2-input" style="width:100%;margin:6px 0 12px;">${branchOptions}</select>
-            <label><b>Contraseña ${editing?'(dejar vacío para no cambiar)':'*'}</b></label><input id="swal-pass" type="password" class="swal2-input" style="width:100%;margin:6px 0 12px;">
-            ${editing ? `<label><b>Estado</b></label><select id="swal-estado" class="swal2-input" style="width:100%;margin:6px 0;"><option ${record.estado==='ACTIVO'?'selected':''}>ACTIVO</option><option ${record.estado==='INACTIVO'?'selected':''}>INACTIVO</option></select>` : ''}
+            <label><b>${Lp.nombre}</b></label><input id="swal-nom" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.nombre):''}">
+            <label><b>${Lp.apellido}</b></label><input id="swal-ape" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.apellido||''):''}">
+            <label><b>${Lp.correo}</b></label><input id="swal-correo" type="email" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.correo):''}">
+            <label><b>${Lp.rol}</b></label><select id="swal-rol" class="swal2-input" style="width:100%;margin:6px 0 12px;">${roleOptions}</select>
+            <label><b>${Lp.suc}</b></label><select id="swal-suc" class="swal2-input" style="width:100%;margin:6px 0 12px;">${branchOptions}</select>
+            <label><b>${Lp.pass} ${editing?Lp.passEdit:'*'}</b></label><input id="swal-pass" type="password" class="swal2-input" style="width:100%;margin:6px 0 12px;">
+            ${editing ? `<label><b>${Lp.estado}</b></label><select id="swal-estado" class="swal2-input" style="width:100%;margin:6px 0;"><option ${record.estado==='ACTIVO'?'selected':''}>ACTIVO</option><option${record.estado==='INACTIVO'?'selected':''}>INACTIVO</option></select>` : ''}
         </div>`,
-        confirmButtonText: 'Guardar', confirmButtonColor: 'var(--coffee-main)', showCancelButton: true, cancelButtonText: 'Cancelar',
+        confirmButtonText: t('guardar'), confirmButtonColor: 'var(--coffee-main)', showCancelButton: true, cancelButtonText: t('cancelar'),
         preConfirm: () => {
             const nombre = document.getElementById('swal-nom').value.trim();
             const correo = document.getElementById('swal-correo').value.trim();
-            if (!nombre || !correo) { Swal.showValidationMessage('Nombre y correo son obligatorios.'); return false; }
+            if (!nombre || !correo) { Swal.showValidationMessage(Lp.required); return false; }
             const out = { nombre, apellido: document.getElementById('swal-ape').value, correo, id_rol: document.getElementById('swal-rol').value, id_sucursal: document.getElementById('swal-suc').value, password: document.getElementById('swal-pass').value };
             if (editing) { out.id = record.id_usuario; out.estado = document.getElementById('swal-estado').value; }
             return out;
@@ -777,7 +790,8 @@ document.addEventListener('click', async e => {
     if (editBtn) personalModal(JSON.parse(editBtn.dataset.editPer));
     const delBtn = e.target.closest('[data-del-per]');
     if (delBtn) {
-        const conf = await Swal.fire({ title:'¿Eliminar registro?', text:'Se eliminará permanentemente este usuario.', icon:'warning', showCancelButton:true, confirmButtonColor:'var(--danger)', confirmButtonText:'Sí, eliminar', cancelButtonText:'Cancelar' });
+        const Ld2 = currentLang === 'en' ? { title:'Delete record?', text:'This user will be permanently deleted.' } : { title:'¿Eliminar registro?', text:'Se eliminará permanentemente este usuario.' };
+        const conf = await Swal.fire({ title:Ld2.title, text:Ld2.text, icon:'warning', showCancelButton:true, confirmButtonColor:'var(--danger)', confirmButtonText:t('si_eliminar'), cancelButtonText:t('cancelar') });
         if (!conf.isConfirmed) return;
         try {
             const fd = new FormData(); fd.append('id', delBtn.dataset.delPer);
@@ -792,7 +806,7 @@ async function loadBranchSelects() {
     try {
         const { data } = await request('get_sucursales_simple');
         const options = data.map(x => `<option value="${x.id_sucursal}">${escapeHtml(x.nombre)}</option>`).join('');
-        ['#inventoryBranch','#salesBranch'].forEach(s => $(s).innerHTML = '<option value="">Todas las sucursales</option>' + options);
+        ['#inventoryBranch','#salesBranch'].forEach(s => $(s).innerHTML = `<option value="">${t('todas_sucursales')}</option>` + options);
     } catch (e) {}
 }
 async function loadInventario() {
@@ -813,9 +827,15 @@ async function loadProductos() {
         const q = $('#productsSearch').value;
         const { data } = await request(`get_productos&q=${encodeURIComponent(q)}`);
         $('#productosTable').innerHTML = data.length ? data.map(x => `<tr>
-            <td><b>${escapeHtml(x.codigo)}</b></td><td><b>${escapeHtml(x.nombre)}</b></td><td>${escapeHtml(x.categoria)}</td><td>${money(x.precio)}</td>
+            <td>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <img src="${x.imagen_url ? escapeHtml(x.imagen_url) : 'https://placehold.co/100x100?text=Sin+Imagen'}" style="width:36px; height:36px; border-radius:8px; object-fit:cover; border:1px solid var(--border-soft);">
+                    <b>${escapeHtml(x.codigo)}</b>
+                </div>
+            </td>
+            <td><b>${escapeHtml(x.nombre)}</b></td><td>${escapeHtml(x.categoria)}</td><td>${money(x.precio)}</td>
             <td>${statusBadge(x.estado)}</td>
-            <td class="row-actions"><button class="chip-btn" data-view-prod="${x.id_producto}">Ver stock</button><button class="chip-btn" data-edit-prod='${JSON.stringify(x).replace(/'/g,'&#39;')}'>Editar</button><button class="icon-x" data-del-prod="${x.id_producto}"><i class="ph ph-trash"></i></button></td>
+            <td class="row-actions"><button class="chip-btn" data-view-prod="${x.id_producto}">${t('ver_stock')}</button><button class="chip-btn" data-edit-prod='${JSON.stringify(x).replace(/'/g,'&#39;')}'>${t('editar')}</button><button class="icon-x" data-del-prod="${x.id_producto}"><i class="ph ph-trash"></i></button></td>
         </tr>`).join('') : empty(6);
     } catch (e) { notify(e.message, 'error'); }
 }
@@ -836,26 +856,50 @@ async function productoModal(record = null) {
     const branchChecks = sucursales.map(s => `<label style="font-size:13px; display:flex; align-items:center; gap:6px;"><input type="checkbox" class="swal-suc-chk" value="${s.id_sucursal}" ${asignadas.includes(s.id_sucursal)?'checked':''}> ${escapeHtml(s.nombre)}</label>`).join('');
 
     const { value: form } = await Swal.fire({
-        title: editing ? 'Editar Producto' : 'Nuevo Producto',
+        title: editing ? t('modal_prod_edit') : t('modal_prod_new'),
         html: `<div style="text-align:left;">
-            <label><b>Código *</b></label><input id="swal-codigo" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.codigo):''}">
-            <label><b>Nombre *</b></label><input id="swal-nombre" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.nombre):''}">
-            <label><b>Descripción</b></label><input id="swal-desc" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.descripcion||''):''}">
-            <label><b>Categoría</b></label><select id="swal-cat" class="swal2-input" style="width:100%;margin:6px 0 12px;">${catOptions}</select>
-            <label><b>Precio base *</b></label><input id="swal-precio" type="number" step="0.01" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?record.precio:''}">
+            <div style="text-align:center; margin-bottom:12px;">
+                <img id="swal-preview" class="swal-preview-img" src="${editing && record.imagen_url ? escapeHtml(record.imagen_url) : 'https://placehold.co/150x150?text=Sin+Imagen'}">
+            </div>
+            <label><b>${t('img_url')}</b></label><input id="swal-img" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.imagen_url||''):''}" placeholder="https://...">
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1"><label><b>${t('th_codigo')} *</b></label><input id="swal-codigo" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.codigo):''}"></div>
+                <div style="flex:2"><label><b>${t('th_producto')} *</b></label><input id="swal-nombre" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?escapeHtml(record.nombre):''}"></div>
+            </div>
+            <label><b>${t('desc_lbl')}</b></label>
+            <textarea id="swal-desc" class="swal2-textarea" style="width:100%;margin:6px 0 12px; font-family:inherit; min-height:80px;">${editing?escapeHtml(record.descripcion||''):''}</textarea>
+            
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1"><label><b>${t('th_categoria')}</b></label><select id="swal-cat" class="swal2-input" style="width:100%;margin:6px 0 12px;">${catOptions}</select></div>
+                <div style="flex:1"><label><b>${t('th_precio')} *</b></label><input id="swal-precio" type="number" step="0.01" class="swal2-input" style="width:100%;margin:6px 0 12px;" value="${editing?record.precio:''}"></div>
+            </div>
+
             <div style="padding:14px; background:var(--bg-app); border:1px solid var(--border-soft); border-radius:10px; margin:10px 0;">
-                <label><b>Asignar a sucursales:</b></label>
+                <label><b>${t('asign_suc')}</b></label>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">${branchChecks || '<span style="font-size:12px;color:var(--ink-faint)">No hay sucursales activas.</span>'}</div>
             </div>
-            ${editing ? `<label><b>Estado</b></label><select id="swal-estado" class="swal2-input" style="width:100%;margin:6px 0;"><option ${record.estado==='ACTIVO'?'selected':''}>ACTIVO</option><option ${record.estado==='INACTIVO'?'selected':''}>INACTIVO</option></select>` : ''}
+            ${editing ? `<label><b>Estado</b></label><select id="swal-estado" class="swal2-input" style="width:100%;margin:6px 0;"><option ${record.estado==='ACTIVO'?'selected':''}>ACTIVO</option><option${record.estado==='INACTIVO'?'selected':''}>INACTIVO</option></select>` : ''}
         </div>`,
-        confirmButtonText: 'Guardar', confirmButtonColor: 'var(--coffee-main)', showCancelButton: true, cancelButtonText: 'Cancelar', width: 520,
+        confirmButtonText: t('guardar'), confirmButtonColor: 'var(--coffee-main)', showCancelButton: true, cancelButtonText: t('cancelar'), width: 550,
+        didOpen: () => {
+            document.getElementById('swal-img').addEventListener('input', e => {
+                document.getElementById('swal-preview').src = e.target.value.trim() || 'https://placehold.co/150x150?text=Sin+Imagen';
+            });
+        },
         preConfirm: () => {
             const codigo = document.getElementById('swal-codigo').value.trim();
             const nombre = document.getElementById('swal-nombre').value.trim();
             if (!codigo || !nombre) { Swal.showValidationMessage('Código y nombre son obligatorios.'); return false; }
             const sucs = Array.from(document.querySelectorAll('.swal-suc-chk:checked')).map(c => c.value);
-            const out = { codigo, nombre, descripcion: document.getElementById('swal-desc').value, id_categoria: document.getElementById('swal-cat').value, precio: document.getElementById('swal-precio').value, sucursales: sucs };
+            const out = { 
+                codigo, 
+                nombre, 
+                imagen_url: document.getElementById('swal-img').value.trim(),
+                descripcion: document.getElementById('swal-desc').value.trim(), 
+                id_categoria: document.getElementById('swal-cat').value, 
+                precio: document.getElementById('swal-precio').value, 
+                sucursales: sucs 
+            };
             if (editing) { out.id = record.id_producto; out.estado = document.getElementById('swal-estado').value; }
             return out;
         }
@@ -874,7 +918,7 @@ document.addEventListener('click', async e => {
     if (editBtn) productoModal(JSON.parse(editBtn.dataset.editProd));
     const delBtn = e.target.closest('[data-del-prod]');
     if (delBtn) {
-        const conf = await Swal.fire({ title:'¿Eliminar producto?', text:'Se eliminará el producto y su inventario asociado.', icon:'warning', showCancelButton:true, confirmButtonColor:'var(--danger)', confirmButtonText:'Sí, eliminar', cancelButtonText:'Cancelar' });
+        const conf = await Swal.fire({ title:'¿Eliminar producto?', text:'Se eliminará el producto y su inventario asociado.', icon:'warning', showCancelButton:true, confirmButtonColor:'var(--danger)', confirmButtonText:t('si_eliminar'), cancelButtonText:t('cancelar') });
         if (!conf.isConfirmed) return;
         try {
             const fd = new FormData(); fd.append('id', delBtn.dataset.delProd);
@@ -886,7 +930,7 @@ document.addEventListener('click', async e => {
     if (viewBtn) {
         try {
             const { data } = await request(`get_producto_detalle&id=${viewBtn.dataset.viewProd}`);
-            Swal.fire({ title: 'Stock por sucursal', html: data.length ? `<table style="width:100%;text-align:left;"><tr><th>Sucursal</th><th style="text-align:right">Existencias</th></tr>${data.map(x=>`<tr><td>${escapeHtml(x.sucursal)}</td><td style="text-align:right"><b>${x.existencias}</b></td></tr>`).join('')}</table>` : '<p>No está asignado a ninguna sucursal.</p>' });
+            Swal.fire({ title: 'Stock por sucursal', html: data.length ? `<table style="width:100%;text-align:left;"><tr><th>Sucursal</th><th style="text-align:right">Existencias</th></tr>${data.map(x=>`<tr><td>${escapeHtml(x.sucursal)}</td><td style="text-align:right"><b>${x.existencias}</b></td></tr>`).join('')}</table>` : `<p>${t('no_asignado')}</p>` });
         } catch (err) { notify(err.message, 'error'); }
     }
 });
@@ -899,7 +943,7 @@ async function loadVentas() {
         $('#ventasTable').innerHTML = data.length ? data.map(x => `<tr>
             <td>#${x.id_venta}</td><td>${new Date(x.fecha_hora).toLocaleString('es-MX')}</td><td>${escapeHtml(x.sucursal)}</td><td>${escapeHtml(x.empleado)}</td><td>${escapeHtml(x.metodo_pago)}</td>
             <td><b>${money(x.total)}</b></td><td>${statusBadge(x.estado)}</td>
-            <td><button class="chip-btn" data-ver-venta="${x.id_venta}">Ver</button></td>
+            <td><button class="chip-btn" data-ver-venta="${x.id_venta}">${t('ver')}</button></td>
         </tr>`).join('') : empty(8);
     } catch (e) { notify(e.message, 'error'); }
 }
@@ -909,12 +953,12 @@ document.addEventListener('click', async e => {
     if (!verBtn) return;
     try {
         const { data } = await request(`get_venta_detalle&id=${verBtn.dataset.verVenta}`);
-        Swal.fire({ title: `Detalle Venta #${verBtn.dataset.verVenta}`, html: data.length ? `<table style="width:100%;text-align:left;"><tr><th>Producto</th><th>Cant</th><th style="text-align:right">Subtotal</th></tr>${data.map(x=>`<tr><td>${escapeHtml(x.producto)}</td><td>${x.cantidad}</td><td style="text-align:right">${money(x.subtotal)}</td></tr>`).join('')}</table>` : 'Sin datos.' });
+        Swal.fire({ title: `Detalle Venta #${verBtn.dataset.verVenta}`, html: data.length ? `<table style="width:100%;text-align:left;"><tr><th>Producto</th><th>Cant</th><th style="text-align:right">Subtotal</th></tr>${data.map(x=>`<tr><td>${escapeHtml(x.producto)}</td><td>${x.cantidad}</td><td style="text-align:right">${money(x.subtotal)}</td></tr>`).join('')}</table>` : t('sin_datos') });
     } catch (e) { notify(e.message, 'error'); }
 });
 
 // -------- INICIO --------
-const initial = <?= json_encode(['labels' => $v7['labels'] ?? [], 'ingresos' => $v7['ingresos'] ?? [], 'payments' => $mp], JSON_UNESCAPED_UNICODE) ?>;
+const initial = <?= json_encode(['labels' => $v7['labels'] ?? [], 'ingresos' => $v7['ingresos'] ?? [], 'payments' =>$mp], JSON_UNESCAPED_UNICODE) ?>;
 window.addEventListener('DOMContentLoaded', () => {
     const palette = ['#936545', '#547c5c', '#648ba6', '#b3832e', '#a66d7e'];
     if (window.Chart) {
