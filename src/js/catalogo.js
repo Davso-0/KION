@@ -67,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cart_empty: 'Tu carrito está vacío.',
             alert_added: '¡Agregado a la manada! 🐾',
             alert_max: 'No puedes agregar más del stock disponible',
+            alert_login: 'Inicia sesión para comprar',
             btn_view: 'Vista ampliada',
             modal_zoom: 'Pasa el cursor para ampliar',
             modal_code: 'Código',
@@ -178,6 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cart_empty: 'Your cart is empty.',
             alert_added: 'Added to the pack! 🐾',
             alert_max: 'You cannot exceed the available stock',
+            alert_login: 'Log in to shop',
             btn_view: 'Quick view',
             modal_zoom: 'Hover to zoom',
             modal_code: 'SKU',
@@ -848,7 +850,21 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCartUI();
     }
 
+    const SESION = window.PETKO_SESION || { autenticado: false, loginUrl: '../../../inicioSesion.php' };
+    let redireccionLoginPendiente = false;
+
+    function requiereSesion() {
+        if (SESION.autenticado) return true;
+        showToast(t('alert_login'), 'warning');
+        if (!redireccionLoginPendiente) {
+            redireccionLoginPendiente = true;
+            setTimeout(() => { window.location.href = SESION.loginUrl; }, 1800);
+        }
+        return false;
+    }
+
     function addToCart(id, nombre, precio, img, maxStock) {
+        if (!requiereSesion()) return false;
         const existing = cart.find(item => item.id === id);
         let agregado = true;
         if (existing) {
@@ -976,6 +992,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function apartarProducto(p) {
+        if (!requiereSesion()) return false;
         depurarVencidos();
         if (p.stock <= 0) {
             showToast(t('reserve_out'), 'warning');

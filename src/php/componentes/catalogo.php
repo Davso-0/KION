@@ -1,6 +1,14 @@
 <?php
 declare(strict_types=1);
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// inicioSesion.php guarda al usuario en $_SESSION['usuario'] con su id_usuario.
+$usuarioAutenticado = !empty($_SESSION['usuario']['id_usuario']);
+$rutaLogin = '../../../inicioSesion.php';
+
 // Conexión PDO básica para XAMPP local
 $dbHost = 'localhost';
 $dbName = 'kion';
@@ -147,7 +155,7 @@ $rutasImagenesAntiguas = [
         
         <?php 
         // Determinar la ruta del dashboard dinámicamente con las rutas relativas correctas
-        $rutaDashboard = '../../../inicioSesion.php'; // Por defecto si no hay sesión
+        $rutaDashboard = $rutaLogin; // Por defecto si no hay sesión
         $textoPanel = 'Iniciar Sesión';
         $iconoPanel = 'ph-sign-in';
         $claveI18nPanel = 'nav_login';
@@ -595,6 +603,12 @@ $rutasImagenesAntiguas = [
 
 <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
+<script>
+    window.PETKO_SESION = <?= json_encode([
+        'autenticado' => $usuarioAutenticado,
+        'loginUrl'    => $rutaLogin,
+    ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) ?>;
+</script>
 <script src="../../js/catalogo.js?v=<?= (int) @filemtime(__DIR__ . '/../../js/catalogo.js') ?>"></script>
 </body>
 </html>
