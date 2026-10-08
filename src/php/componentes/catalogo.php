@@ -5,21 +5,41 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Conexión a la base de datos
-$rutaConexion = __DIR__ . '/../config/conexion_BD.php';
-if (!file_exists($rutaConexion)) {
-    $rutaConexion = __DIR__ . '/../../config/conexion_BD.php';
-}
-require_once $rutaConexion;
+// inicioSesion.php guarda al usuario en $_SESSION['usuario'] con su id_usuario.
+$usuarioAutenticado = !empty($_SESSION['usuario']['id_usuario']);
+$rutaLogin = '../../../inicioSesion.php';
 
-$categoriaSeleccionada = $_GET['categoria'] ?? null;
-$productos = [];
-$categoriasDisponibles = [];
+// Conexión PDO básica para XAMPP local
+$dbHost = 'localhost';
+$dbName = 'kion';
+$dbUser = 'root';
+$dbPass = '';
+
+$pdo = null;
 $errorConsulta = null;
+
+try {
+    $pdo = new PDO(
+        "mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4",
+        $dbUser,
+        $dbPass,
+        [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]
+    );
+} catch (PDOException $e) {
+    $errorConsulta = 'Fallo al conectar con la base de datos.';
+}
+
+$categoriaSeleccionada = isset($_GET['categoria']) ? (string) $_GET['categoria'] : null;
+$productos = [];
+$productosCatalogo = [];
+$detallesProducto = [];
+$categoriasDisponibles = [];
 
 if (isset($pdo) && $pdo instanceof PDO) {
     try {
-        // 1. Obtener categorías dinámicas reales de la BD
         $catStmt = $pdo->query("SELECT nombre FROM categorias ORDER BY nombre ASC");
         while ($row = $catStmt->fetch(PDO::FETCH_ASSOC)) {
             $categoriasDisponibles[] = $row['nombre'];
@@ -28,40 +48,46 @@ if (isset($pdo) && $pdo instanceof PDO) {
             $categoriasDisponibles = ['Medicamentos', 'Alimentos', 'Antiparasitarios', 'Higiene', 'Accesorios'];
         }
 
-        // 2. Obtener productos con stock real consolidado de todas las sucursales
-        $sql = "SELECT 
-                    p.id_producto, 
-                    p.nombre, 
-                    p.descripcion,
-                    p.precio, 
-                    p.imagen_url,
-                    COALESCE(c.nombre, 'General') AS categoria,
-                    COALESCE(SUM(i.existencias), 0) AS stock
-                FROM productos p
-                LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
-                LEFT JOIN inventarios i ON p.id_producto = i.id_producto
-                LEFT JOIN sucursales s ON i.id_sucursal = s.id_sucursal
-                WHERE p.estado = 'ACTIVO' AND (s.estado = 'ACTIVA' OR s.estado IS NULL)";
+        // Consulta exacta solicitada, sin modificaciones.
+        $sql = "SELECT p.id_producto, p.nombre, p.precio, c.nombre AS categoria, COALESCE(i.existencias, 10) AS stock FROM productos p LEFT JOIN categorias c ON p.id_categoria = c.id_categoria LEFT JOIN inventarios i ON p.id_producto = i.id_producto WHERE p.estado = 'ACTIVO'";
 
-        if ($categoriaSeleccionada !== null && in_array($categoriaSeleccionada, $categoriasDisponibles, true)) {
-            $sql .= " AND c.nombre = :categoria";
-        }
-
-        $sql .= " GROUP BY p.id_producto, p.nombre, p.descripcion, p.precio, p.imagen_url, c.nombre ORDER BY p.nombre ASC";
-        
         $stmt = $pdo->prepare($sql);
-        if ($categoriaSeleccionada !== null && in_array($categoriaSeleccionada, $categoriasDisponibles, true)) {
-            $stmt->bindValue(':categoria', $categoriaSeleccionada, PDO::PARAM_STR);
-        }
-        
         $stmt->execute();
         $productos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $totalCatalogo = count($productos);
+        // Se pintan todos los productos para que JS filtre por categoría
+        // sin recargar; $productos queda como la selección inicial.
+        $productosCatalogo = $productos;
 
+        if ($categoriaSeleccionada !== null && !in_array($categoriaSeleccionada, $categoriasDisponibles, true)) {
+            $categoriaSeleccionada = null;
+        }
+
+        // El filtro por categoría se aplica aquí, en PHP, para no tocar
+        // la consulta SQL pedida.
+        if ($categoriaSeleccionada !== null) {
+            $productos = array_values(array_filter($productos, function ($p) use ($categoriaSeleccionada) {
+                return ($p['categoria'] ?? null) === $categoriaSeleccionada;
+            }));
+        }
     } catch (PDOException $e) {
         $errorConsulta = 'No pudimos cargar los productos en este momento.';
     }
-} else {
-    $errorConsulta = 'Fallo al conectar con la base de datos.';
+
+    // Consulta aparte y opcional para la vista ampliada: si falla, el
+    // catálogo sigue funcionando sin descripciones.
+    try {
+        $detStmt = $pdo->query("SELECT id_producto, codigo, descripcion FROM productos");
+        foreach ($detStmt as $fila) {
+            $detallesProducto[(int) $fila['id_producto']] = $fila;
+        }
+    } catch (PDOException $e) {
+        $detallesProducto = [];
+    }
+}
+
+function formatearPrecio(float $precio): string {
+    return '$' . number_format($precio, 2) . ' MXN';
 }
 
 $rutasImagenesAntiguas = [
@@ -76,181 +102,67 @@ $rutasImagenesAntiguas = [
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KION · Catálogo</title>
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-    <style>
-        :root {
-            /* VARIABLES MODO CLARO */
-            --bg-app: #F4F5F7;
-            --bg-surface: #FFFFFF;
-            --bg-panel: #FAFAFA;
-            --ink: #1F2328;
-            --ink-soft: #656D76;
-            --border-soft: #D0D7DE;
-            --coffee-main: #936545;
-            --coffee-light: rgba(147, 101, 69, 0.1);
-            --coffee-gradient: linear-gradient(135deg, #A87B57, #7A5134);
-            --success: #1F883D;
-            --danger: #CF222E;
-            --font-display: 'Fraunces', serif;
-            --font-body: 'Plus Jakarta Sans', sans-serif;
-            --shadow-sm: 0 4px 12px rgba(0,0,0,0.04);
-            --shadow-md: 0 10px 24px rgba(0,0,0,0.08);
-            --radius: 16px;
-        }
-
-        /* VARIABLES MODO OSCURO */
-        body.dark-mode {
-            --bg-app: oklch(20% 0.01 250); 
-            --bg-surface: oklch(25% 0.01 250);
-            --bg-panel: oklch(23% 0.01 250);
-            --ink: oklch(95% 0.01 250); 
-            --ink-soft: oklch(75% 0.01 250); 
-            --border-soft: oklch(35% 0.01 250);
-            --coffee-main: oklch(80% 0.03 60); 
-            --coffee-light: rgba(179, 131, 91, 0.15);
-            --coffee-gradient: linear-gradient(155deg, oklch(40% 0.045 48), oklch(20% 0.035 52));
-            --success: oklch(70% 0.1 152);
-            --danger: oklch(65% 0.15 25);
-            --shadow-sm: 0 4px 12px rgba(0,0,0,0.4);
-            --shadow-md: 0 10px 24px rgba(0,0,0,0.6);
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font-body); background: var(--bg-app); color: var(--ink); -webkit-font-smoothing: antialiased; transition: background 0.3s ease, color 0.3s ease; }
-        a { text-decoration: none; color: inherit; }
-        button { border: none; background: none; cursor: pointer; font-family: inherit; }
-
-        /* HEADER */
-        .topbar { display: flex; justify-content: space-between; align-items: center; padding: 16px 40px; background: var(--bg-surface); border-bottom: 1px solid var(--border-soft); position: sticky; top: 0; z-index: 50; box-shadow: var(--shadow-sm); transition: background 0.3s ease, border-color 0.3s ease; }
-        .topbar__marca { display: flex; align-items: baseline; gap: 12px; }
-        .topbar__logo { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 8px; transition: color 0.3s ease; }
-        .topbar__logo i { color: var(--coffee-main); }
-        .topbar__subtitulo { font-size: 13px; color: var(--ink-soft); display: none; }
-        
-        .topbar__acciones { display: flex; align-items: center; gap: 14px; }
-        .btn-nav { font-weight: 600; font-size: 13.5px; padding: 8px 16px; border-radius: 10px; background: var(--bg-app); border: 1px solid var(--border-soft); transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px; color: var(--ink); }
-        .btn-nav:hover { background: var(--coffee-light); color: var(--coffee-main); border-color: var(--coffee-main); }
-        .btn-icon { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--bg-app); border: 1px solid var(--border-soft); font-size: 20px; transition: all 0.2s ease; color: var(--ink); }
-        .btn-icon:hover { background: var(--coffee-light); color: var(--coffee-main); border-color: var(--coffee-main); }
-        
-        .topbar__carrito { position: relative; }
-        .topbar__carrito-conteo { position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; font-size: 11px; font-weight: 800; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--bg-surface); }
-
-        /* LAYOUT PRINCIPAL */
-        .layout { display: grid; grid-template-columns: 240px 1fr; gap: 40px; padding: 40px; max-width: 1440px; margin: 0 auto; min-height: 80vh; }
-        
-        /* SIDEBAR FILTROS */
-        .filtros__titulo { font-family: var(--font-display); font-size: 18px; font-weight: 600; margin-bottom: 20px; border-bottom: 1px solid var(--border-soft); padding-bottom: 10px; }
-        .filtros__lista { display: flex; flex-direction: column; gap: 6px; }
-        .filtros__enlace { padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 500; color: var(--ink-soft); transition: all 0.2s ease; display: flex; align-items: center; justify-content: space-between; }
-        .filtros__enlace:hover { background: var(--bg-surface); color: var(--ink); box-shadow: var(--shadow-sm); }
-        .filtros__enlace--activo { background: var(--coffee-main); color: white; font-weight: 700; }
-        .filtros__enlace--activo:hover { background: var(--coffee-main); color: white; }
-
-        /* MAIN CATALOGO */
-        .catalogo__encabezado { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
-        .catalogo__encabezado h1 { font-family: var(--font-display); font-size: 32px; font-weight: 700; }
-        .catalogo__conteo { font-size: 14px; font-weight: 600; color: var(--ink-soft); background: var(--bg-surface); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border-soft); }
-        
-        .estado-vacio { text-align: center; padding: 60px 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px dashed var(--border-soft); color: var(--ink-soft); }
-        
-        .grid-productos { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px; }
-        
-        /* TARJETA PRODUCTO */
-        .tarjeta { background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border-soft); overflow: hidden; box-shadow: var(--shadow-sm); transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease; display: flex; flex-direction: column; }
-        .tarjeta:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); border-color: var(--coffee-main); }
-        .tarjeta__imagen { position: relative; width: 100%; padding-top: 85%; background: var(--bg-panel); border-bottom: 1px solid var(--border-soft); overflow: hidden; }
-        .tarjeta__imagen img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
-        .tarjeta:hover .tarjeta__imagen img { transform: scale(1.05); }
-        .tarjeta__badge { position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,0.9); backdrop-filter: blur(4px); color: #1F2328; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-soft); box-shadow: var(--shadow-sm); z-index: 2; }
-        .dark-mode .tarjeta__badge { background: rgba(0,0,0,0.7); color: #FFF; border-color: rgba(255,255,255,0.2); }
-        
-        .tarjeta__cuerpo { padding: 20px; display: flex; flex-direction: column; flex: 1; }
-        .tarjeta__titulo { font-family: var(--font-display); font-size: 18px; font-weight: 600; line-height: 1.3; margin-bottom: 6px; }
-        .tarjeta__desc { font-size: 13px; color: var(--ink-soft); flex: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 14px; }
-        
-        .tarjeta__meta { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; }
-        .tarjeta__precio { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--coffee-main); }
-        .tarjeta__stock { font-size: 12px; font-weight: 700; background: var(--bg-app); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-soft); }
-        .stock-ok { color: var(--success); }
-        .stock-none { color: var(--danger); background: rgba(207,34,46,0.1); border-color: rgba(207,34,46,0.2); }
-        
-        .btn-agregar { width: 100%; background: var(--coffee-gradient); color: white; font-weight: 700; font-size: 14px; padding: 12px; border-radius: 10px; transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease; display: flex; justify-content: center; align-items: center; gap: 8px; border: none; }
-        .btn-agregar:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(147,101,69,0.3); }
-        .btn-agregar:active:not(:disabled) { transform: scale(0.97); }
-        .btn-agregar:disabled { background: var(--border-soft); color: var(--ink-soft); cursor: not-allowed; }
-
-        /* PANEL DEL CARRITO (Sliding) */
-        .cart-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); z-index: 90; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
-        .cart-overlay.active { opacity: 1; pointer-events: auto; }
-        
-        .cart-panel { position: fixed; top: 0; right: -420px; width: 400px; max-width: 100%; height: 100vh; background: var(--bg-surface); z-index: 100; box-shadow: -10px 0 30px rgba(0,0,0,0.2); transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease; display: flex; flex-direction: column; }
-        .cart-panel.active { right: 0; }
-        
-        .cart-panel__header { padding: 24px; border-bottom: 1px solid var(--border-soft); display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); }
-        .cart-panel__header h2 { font-family: var(--font-display); font-size: 22px; margin: 0; }
-        .cart-panel__close { font-size: 24px; color: var(--ink-soft); transition: color 0.2s ease; }
-        .cart-panel__close:hover { color: var(--danger); }
-        
-        .cart-panel__items { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
-        
-        .cart-item { display: grid; grid-template-columns: 70px 1fr; gap: 14px; padding-bottom: 16px; border-bottom: 1px solid var(--border-soft); }
-        .cart-item__img { width: 100%; height: 70px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border-soft); }
-        .cart-item__info { display: flex; flex-direction: column; justify-content: space-between; }
-        .cart-item__title { font-weight: 600; font-size: 14px; line-height: 1.2; margin-bottom: 4px; color: var(--ink); }
-        .cart-item__price { font-weight: 700; color: var(--coffee-main); font-size: 14px; }
-        
-        /* Controles de Cantidad */
-        .cart-qty-controls { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-        .qty-btn { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border-soft); background: var(--bg-app); color: var(--ink); font-weight: 700; font-size: 16px; display: grid; place-items: center; transition: all 0.2s ease; }
-        .qty-btn:hover { background: var(--border-soft); }
-        .qty-input { width: 45px; height: 28px; text-align: center; border: 1px solid var(--border-soft); border-radius: 6px; font-family: var(--font-body); font-weight: 600; font-size: 14px; background: var(--bg-surface); color: var(--ink); -moz-appearance: textfield; transition: border-color 0.2s; }
-        .qty-input::-webkit-outer-spin-button, .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        .qty-input:focus { outline: none; border-color: var(--coffee-main); }
-        .btn-remove { margin-left: auto; color: var(--danger); font-size: 18px; padding: 4px; border-radius: 6px; transition: background 0.2s; }
-        .btn-remove:hover { background: rgba(207,34,46,0.1); }
-
-        .cart-panel__footer { padding: 24px; border-top: 1px solid var(--border-soft); background: var(--bg-panel); }
-        .cart-panel__total { display: flex; justify-content: space-between; align-items: center; font-size: 20px; font-weight: 700; margin-bottom: 20px; font-family: var(--font-display); }
-        .cart-panel__checkout { width: 100%; background: var(--coffee-gradient); color: white; font-weight: 700; font-size: 16px; padding: 14px; border-radius: 12px; display: flex; justify-content: center; gap: 8px; transition: transform 0.2s; border: none; }
-        .cart-panel__checkout:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(147,101,69,0.3); }
-
-        /* Dark mode Swal overrides */
-        .dark-mode .swal2-popup { background: var(--bg-surface); color: var(--ink); }
-
-        @media (max-width: 900px) {
-            .layout { grid-template-columns: 1fr; padding: 20px; }
-            .topbar__subtitulo { display: none; }
-            .filtros__lista { flex-direction: row; overflow-x: auto; padding-bottom: 10px; }
-            .filtros__enlace { white-space: nowrap; }
-        }
-    </style>
+    <title>PETKO · Catálogo</title>
+    <script>
+        (function () {
+            try {
+                var escala = parseFloat(localStorage.getItem('kion-font-scale'));
+                if (escala >= 0.9 && escala <= 1.3) {
+                    document.documentElement.style.setProperty('--font-scale', escala);
+                    if (escala >= 1.2) document.documentElement.classList.add('texto-grande');
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+    <link rel="stylesheet" href="../../css/catalogo.css?v=<?= (int) @filemtime(__DIR__ . '/../../css/catalogo.css') ?>">
 </head>
-<body>
+<body class="catalogo-app">
 
 <header class="topbar">
     <div class="topbar__marca">
-        <a href="../modulos/home/home.php" class="topbar__logo"><i class="ph-fill ph-paw-print"></i> KION</a>
-        <span class="topbar__subtitulo" data-i18n="topbar_sub">Experiencia Premium para el cuidado animal.</span>
+        <a href="../modulos/home/home.php" class="topbar__logo" aria-label="PETKO · Inicio">
+            <span class="topbar__logo-icono" aria-hidden="true"><i class="ph-fill ph-paw-print"></i></span>
+            <span class="topbar__logo-texto">PET<span>KO</span></span>
+        </a>
+        <span class="topbar__subtitulo" data-i18n="topbar_sub">Veterinaria y Farmacia · cuidado con patitas.</span>
+        <span class="topbar__badge"><i class="ph-fill ph-heartbeat"></i> Clínica</span>
     </div>
 
     <div class="topbar__acciones">
+        <div class="a11y" id="a11y">
+            <button type="button" class="btn-icon a11y__toggle" id="a11y-toggle"
+                    aria-expanded="false" aria-controls="a11y-grupo"
+                    aria-label="Tamaño de texto" title="Tamaño de texto" data-i18n-aria="a11y_title">
+                <i class="ph ph-text-aa"></i>
+            </button>
+            <div class="a11y__grupo" id="a11y-grupo" role="group" aria-label="Tamaño de texto" data-i18n-aria="a11y_title">
+                <button type="button" class="a11y__btn a11y__btn--menos" data-a11y="menos"
+                        aria-label="Reducir texto" title="Reducir texto" data-i18n-aria="a11y_less">A<span aria-hidden="true">−</span></button>
+                <button type="button" class="a11y__btn a11y__btn--base" data-a11y="base"
+                        aria-label="Tamaño de texto por defecto" title="Tamaño de texto por defecto" data-i18n-aria="a11y_default">A</button>
+                <button type="button" class="a11y__btn a11y__btn--mas" data-a11y="mas"
+                        aria-label="Aumentar texto" title="Aumentar texto" data-i18n-aria="a11y_more">A<span aria-hidden="true">+</span></button>
+                <span class="a11y__nivel" id="a11y-nivel" aria-live="polite">100%</span>
+            </div>
+        </div>
         <button class="btn-icon" id="btnTheme" title="Modo Oscuro / Claro"><i class="ph ph-moon"></i></button>
         <button class="btn-icon" id="btnLang" title="English / Español"><i class="ph ph-translate"></i></button>
         
         <?php 
         // Determinar la ruta del dashboard dinámicamente con las rutas relativas correctas
-        $rutaDashboard = '../../inicioSesion.php'; // Por defecto si no hay sesión
+        $rutaDashboard = $rutaLogin; // Por defecto si no hay sesión
         $textoPanel = 'Iniciar Sesión';
         $iconoPanel = 'ph-sign-in';
+        $claveI18nPanel = 'nav_login';
         
         if (isset($_SESSION['usuario'])) {
             $textoPanel = 'Panel';
             $iconoPanel = 'ph-squares-four';
+            $claveI18nPanel = 'nav_dashboard';
             $rolSesion = strtolower($_SESSION['usuario']['rol'] ?? '');
             
             if (strpos($rolSesion, 'admin') !== false) {
@@ -265,58 +177,145 @@ $rutasImagenesAntiguas = [
         ?>
         
         <a href="<?= htmlspecialchars($rutaDashboard, ENT_QUOTES, 'UTF-8') ?>" class="btn-nav">
-            <i class="ph <?= $iconoPanel ?>"></i> <span data-i18n="nav_dashboard"><?= $textoPanel ?></span>
+            <i class="ph <?= $iconoPanel ?>"></i> <span data-i18n="<?= $claveI18nPanel ?>"><?= $textoPanel ?></span>
         </a>
         
         <button class="btn-icon topbar__carrito" id="open-cart" aria-label="Carrito">
             <i class="ph ph-shopping-cart"></i>
-            <span id="cart-count" class="topbar__carrito-conteo">0</span>
+            <span id="cart-count" class="topbar__carrito-conteo is-empty" aria-live="polite">0</span>
         </button>
     </div>
 </header>
 
+<div class="hero-wrap">
+    <section class="hero" aria-labelledby="hero-titulo">
+        <div class="hero__contenido">
+            <span class="hero__eyebrow">
+                <i class="ph-fill ph-first-aid-kit" aria-hidden="true"></i>
+                <span data-i18n="hero_eyebrow">Veterinaria &amp; Farmacia</span>
+            </span>
+            <h1 class="hero__titulo" id="hero-titulo" data-i18n="hero_title">Farmacia para tu <em>manada</em></h1>
+            <p class="hero__subtitulo" data-i18n="hero_sub">Medicamentos, nutrición y accesorios elegidos con criterio clínico para el bienestar de perros, gatos y cada integrante de tu familia.</p>
+            <div class="hero__acciones">
+                <a href="#catalogo" class="hero__cta">
+                    <span data-i18n="hero_cta">Explorar catálogo</span>
+                    <i class="ph-bold ph-arrow-down" aria-hidden="true"></i>
+                </a>
+            </div>
+            <dl class="hero__stats">
+                <div class="hero__stat">
+                    <dt><?= (int) ($totalCatalogo ?? count($productos)) ?></dt>
+                    <dd data-i18n="hero_stat_products">productos</dd>
+                </div>
+                <div class="hero__stat">
+                    <dt><?= count($categoriasDisponibles) ?></dt>
+                    <dd data-i18n="hero_stat_categories">categorías</dd>
+                </div>
+                <div class="hero__stat">
+                    <dt><i class="ph-fill ph-heartbeat" aria-hidden="true"></i></dt>
+                    <dd data-i18n="hero_stat_vet">asesoría veterinaria</dd>
+                </div>
+            </dl>
+        </div>
+        <div class="hero__visual" aria-hidden="true">
+            <div class="hero__orbe">
+                <span class="hero__orbe-anillo"></span>
+                <i class="ph-fill ph-paw-print"></i>
+            </div>
+            <span class="hero__chip hero__chip--1"><i class="ph-fill ph-pill"></i> <span data-i18n="hero_chip_1">Farmacia</span></span>
+            <span class="hero__chip hero__chip--2"><i class="ph-fill ph-bowl-food"></i> <span data-i18n="hero_chip_2">Nutrición</span></span>
+            <span class="hero__chip hero__chip--3"><i class="ph-fill ph-heart"></i> <span data-i18n="hero_chip_3">Bienestar</span></span>
+        </div>
+    </section>
+</div>
+
 <div class="layout">
     <aside class="filtros">
-        <h2 class="filtros__titulo" data-i18n="filter_title">Categorías</h2>
+        <div class="filtros__busqueda">
+            <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="busqueda-catalogo" name="busqueda" autocomplete="off"
+                   placeholder="Buscar producto..."
+                   data-i18n-placeholder="search_ph"
+                   aria-label="Buscar producto">
+        </div>
+        <div class="filtros__hero">
+            <img src="../../img/perrito_clinica.png" alt="Perrito veterinario con estetoscopio" class="filtros__mascota">
+            <div class="perrito-globo" id="perrito-globo" data-tono="reposo" role="status" aria-live="polite">
+                <p class="perrito-globo__texto filtros__saludo" id="perrito-globo-texto">¡Guau! Elige una categoría</p>
+                <i class="ph-fill ph-paw-print perrito-globo__huella" aria-hidden="true"></i>
+            </div>
+        </div>
+        <h2 class="filtros__titulo"><i class="ph-fill ph-paw-print"></i> <span data-i18n="filter_title">Categorías</span></h2>
         <nav class="filtros__lista">
-            <a href="catalogo.php" class="filtros__enlace <?= $categoriaSeleccionada === null ? 'filtros__enlace--activo' : '' ?>">
+            <a href="catalogo.php" data-categoria="" class="filtros__enlace <?= $categoriaSeleccionada === null ? 'filtros__enlace--activo' : '' ?>"<?= $categoriaSeleccionada === null ? ' aria-current="page"' : '' ?>>
+                <i class="ph-fill ph-bone"></i>
                 <span data-i18n="filter_all">Todos los productos</span>
+                <?php if ($categoriaSeleccionada === null): ?><i class="ph-bold ph-check filtros__check" aria-hidden="true"></i><?php endif; ?>
             </a>
-            <?php foreach ($categoriasDisponibles as $cat): ?>
-                <a href="?categoria=<?= urlencode($cat) ?>" class="filtros__enlace <?= $categoriaSeleccionada === $cat ? 'filtros__enlace--activo' : '' ?>">
+            <?php foreach ($categoriasDisponibles as $cat):
+                $iconoCat = 'ph-paw-print';
+                $catLower = mb_strtolower((string) $cat);
+                if (str_contains($catLower, 'medic')) {
+                    $iconoCat = 'ph-pill';
+                } elseif (str_contains($catLower, 'aliment')) {
+                    $iconoCat = 'ph-bowl-food';
+                } elseif (str_contains($catLower, 'antiparas') || str_contains($catLower, 'pulga')) {
+                    $iconoCat = 'ph-bug';
+                } elseif (str_contains($catLower, 'higien') || str_contains($catLower, 'baño')) {
+                    $iconoCat = 'ph-drop';
+                } elseif (str_contains($catLower, 'acces')) {
+                    $iconoCat = 'ph-tennis-ball';
+                }
+            ?>
+                <a href="?categoria=<?= urlencode($cat) ?>" data-categoria="<?= htmlspecialchars($cat, ENT_QUOTES, 'UTF-8') ?>" class="filtros__enlace <?= $categoriaSeleccionada === $cat ? 'filtros__enlace--activo' : '' ?>"<?= $categoriaSeleccionada === $cat ? ' aria-current="page"' : '' ?>>
+                    <i class="ph-fill <?= $iconoCat ?>"></i>
                     <span><?= htmlspecialchars($cat, ENT_QUOTES, 'UTF-8') ?></span>
+                    <?php if ($categoriaSeleccionada === $cat): ?><i class="ph-bold ph-check filtros__check" aria-hidden="true"></i><?php endif; ?>
                 </a>
             <?php endforeach; ?>
         </nav>
     </aside>
 
-    <main class="catalogo">
+    <main class="catalogo" id="catalogo">
         <div class="catalogo__encabezado">
-            <h1><?= $categoriaSeleccionada !== null ? htmlspecialchars($categoriaSeleccionada, ENT_QUOTES, 'UTF-8') : '<span data-i18n="cat_title">Catálogo General</span>' ?></h1>
-            <p class="catalogo__conteo"><?= count($productos) ?> <span data-i18n="cat_items">artículos</span></p>
+            <div>
+                <p class="catalogo__kicker" data-i18n="cat_kicker">Colección PETKO</p>
+                <h2 class="catalogo__titulo" id="catalogo-titulo"><?= $categoriaSeleccionada !== null ? htmlspecialchars($categoriaSeleccionada, ENT_QUOTES, 'UTF-8') : '<span data-i18n="cat_title">Catálogo General</span>' ?></h2>
+            </div>
+            <p class="catalogo__conteo"><span id="conteo-visible"><?= count($productos) ?></span> <span data-i18n="cat_items">artículos</span></p>
         </div>
 
         <?php if ($errorConsulta !== null): ?>
             <div class="estado-vacio">
-                <i class="ph ph-warning-circle" style="font-size: 40px; margin-bottom:10px; color:var(--coffee-main);"></i>
+                <i class="ph ph-warning-circle" style="font-size: 40px; margin-bottom:10px; color:var(--clinic);"></i>
                 <p><?= htmlspecialchars($errorConsulta, ENT_QUOTES, 'UTF-8') ?></p>
             </div>
-        <?php elseif (count($productos) === 0): ?>
+        <?php elseif (count($productosCatalogo) === 0): ?>
             <div class="estado-vacio">
                 <i class="ph ph-package" style="font-size: 40px; margin-bottom:10px; color:var(--ink-soft);"></i>
                 <p data-i18n="empty_state">No hay productos con stock disponible en esta categoría.</p>
             </div>
         <?php else: ?>
+            <div class="estado-vacio" id="categoria-vacia"<?= count($productos) === 0 ? '' : ' hidden' ?>>
+                <i class="ph ph-package" style="font-size: 40px; margin-bottom:10px; color:var(--ink-soft);"></i>
+                <p data-i18n="empty_state">No hay productos con stock disponible en esta categoría.</p>
+            </div>
             <div class="grid-productos">
-                <?php foreach ($productos as $producto):
+                <?php
+                $indiceVisible = 0;
+                foreach ($productosCatalogo as $producto):
+                    $categoriaProd = (string) ($producto['categoria'] ?? '');
+                    $visibleInicial = $categoriaSeleccionada === null || $categoriaProd === $categoriaSeleccionada;
                     $stock   = (int) $producto['stock'];
                     $agotado = $stock <= 0;
                     $nombre  = htmlspecialchars($producto['nombre'], ENT_QUOTES, 'UTF-8');
                     $idProd  = (int) $producto['id_producto'];
                     $precio  = (float) $producto['precio'];
                     
-                    // Lógica de imágenes (Nueva url o fallback antiguo)
-                    $imgSrc = $producto['imagen_url'] ?: '';
+                    // La consulta exacta ya no trae imagen_url ni descripcion,
+                    // así que resolvemos la imagen con el mismo esquema de
+                    // respaldo de siempre y usamos un texto genérico.
+                    $imgSrc = $producto['imagen_url'] ?? '';
                     if (!$imgSrc) {
                         $rutaAutomatica = "../../img/{$idProd}.jpg";
                         if (isset($rutasImagenesAntiguas[$idProd])) {
@@ -324,37 +323,59 @@ $rutasImagenesAntiguas = [
                         } elseif (file_exists($rutaAutomatica)) {
                             $imgSrc = $rutaAutomatica;
                         } else {
-                            $imgSrc = "https://placehold.co/400x400/EEEEEE/936545?text=" . urlencode($producto['categoria']);
+                            $imgSrc = "https://placehold.co/400x400/E8F6EE/0B2545?text=" . urlencode($producto['categoria'] ?? 'PETKO');
                         }
                     }
+                    $detalle     = $detallesProducto[$idProd] ?? [];
+                    $codigo      = htmlspecialchars((string) ($detalle['codigo'] ?? ''), ENT_QUOTES, 'UTF-8');
+                    $descripcion = htmlspecialchars((string) ($detalle['descripcion'] ?? ''), ENT_QUOTES, 'UTF-8');
+                    $imgAttr     = htmlspecialchars($imgSrc, ENT_QUOTES, 'UTF-8');
                 ?>
-                <article class="tarjeta">
-                    <div class="tarjeta__imagen">
-                        <span class="tarjeta__badge"><?= htmlspecialchars($producto['categoria'], ENT_QUOTES, 'UTF-8') ?></span>
-                        <img src="<?= htmlspecialchars($imgSrc, ENT_QUOTES, 'UTF-8') ?>" alt="<?= $nombre ?>" loading="lazy">
+                <article class="tarjeta" data-id="<?= $idProd ?>" data-nombre="<?= $nombre ?>" data-categoria="<?= htmlspecialchars($categoriaProd, ENT_QUOTES, 'UTF-8') ?>"
+                         data-precio="<?= $precio ?>" data-stock="<?= $stock ?>" data-img="<?= $imgAttr ?>"
+                         data-codigo="<?= $codigo ?>" data-descripcion="<?= $descripcion ?>"
+                         style="--i: <?= $visibleInicial ? min($indiceVisible++, 12) : 0 ?>"<?= $visibleInicial ? '' : ' hidden' ?>>
+                    <div class="tarjeta__imagen js-ver-detalle" role="button" tabindex="0" aria-label="Ver detalle de <?= $nombre ?>">
+                        <img src="<?= $imgAttr ?>" alt="<?= $nombre ?>" loading="lazy">
+                        <span class="tarjeta__ver-hint" aria-hidden="true">
+                            <i class="ph-bold ph-arrows-out-simple"></i>
+                            <span data-i18n="btn_view">Vista ampliada</span>
+                        </span>
                     </div>
                     <div class="tarjeta__cuerpo">
-                        <h3 class="tarjeta__titulo"><?= $nombre ?></h3>
-                        <p class="tarjeta__desc"><?= htmlspecialchars($producto['descripcion'] ?: 'Sin descripción detallada.', ENT_QUOTES, 'UTF-8') ?></p>
+                        <span class="tarjeta__categoria"><?= htmlspecialchars($producto['categoria'] ?? 'General', ENT_QUOTES, 'UTF-8') ?></span>
+                        <h3 class="tarjeta__titulo"><button type="button" class="tarjeta__titulo-btn js-ver-detalle"><?= $nombre ?></button></h3>
                         <div class="tarjeta__meta">
                             <span class="tarjeta__precio">$<?= number_format($precio, 2) ?></span>
-                            <span class="tarjeta__stock <?= $agotado ? 'stock-none' : 'stock-ok' ?>">
-                                <?= $agotado ? '<span data-i18n="stock_out">Agotado</span>' : '<span data-i18n="stock_lbl">Disponibles:</span> ' . $stock ?>
-                            </span>
+                            <?php if ($agotado): ?>
+                                <span class="tarjeta__stock stock-none">
+                                    <span data-i18n="stock_out">Agotado</span>
+                                </span>
+                            <?php elseif ($stock < 10): ?>
+                                <span class="tarjeta__stock stock-low">
+                                    🔥 <span data-i18n="stock_low_a">¡Últimas</span> <?= $stock ?> <span data-i18n="stock_low_b">piezas!</span>
+                                </span>
+                            <?php else: ?>
+                                <span class="tarjeta__stock stock-ok">
+                                    <span data-i18n="stock_lbl">Disponibles:</span> <?= $stock ?>
+                                </span>
+                            <?php endif; ?>
                         </div>
-                        <button type="button" class="btn-agregar js-add-cart" 
-                                data-id="<?= $idProd ?>" 
-                                data-nombre="<?= $nombre ?>" 
-                                data-precio="<?= $precio ?>" 
-                                data-img="<?= htmlspecialchars($imgSrc, ENT_QUOTES, 'UTF-8') ?>"
-                                data-stock="<?= $stock ?>" 
-                                <?= $agotado ? 'disabled' : '' ?>>
-                            <i class="ph ph-shopping-cart-plus"></i>
-                            <span><?= $agotado ? '<span data-i18n="btn_out">Sin stock</span>' : '<span data-i18n="btn_add">Agregar al carrito</span>' ?></span>
-                        </button>
                     </div>
                 </article>
                 <?php endforeach; ?>
+            </div>
+            <div class="busqueda-vacia" id="busqueda-vacia" role="status" hidden>
+                <div class="busqueda-vacia__ilustracion">
+                    <img src="../../img/perrito_clinica.png" alt="" aria-hidden="true">
+                    <span class="busqueda-vacia__lupa"><i class="ph-bold ph-magnifying-glass"></i></span>
+                </div>
+                <h2 class="busqueda-vacia__titulo" data-i18n="search_empty_title">¡Guau! No encontramos productos con ese nombre</h2>
+                <p class="busqueda-vacia__texto" data-i18n="search_empty_sub">Revisa la ortografía o prueba con otra palabra, como “croquetas” o “shampoo”.</p>
+                <button type="button" class="busqueda-vacia__btn" id="limpiar-busqueda">
+                    <i class="ph-bold ph-arrow-counter-clockwise"></i>
+                    <span data-i18n="search_clear">Ver todos los productos</span>
+                </button>
             </div>
         <?php endif; ?>
     </main>
@@ -367,250 +388,228 @@ $rutasImagenesAntiguas = [
         <h2 data-i18n="cart_title">Tu Carrito</h2>
         <button id="close-cart" class="cart-panel__close"><i class="ph ph-x"></i></button>
     </div>
-    <div id="cart-items" class="cart-panel__items">
-        <!-- Los items se renderizan aquí -->
+    <div class="cart-panel__scroll">
+        <div id="cart-items" class="cart-panel__items">
+            <!-- Los items se renderizan aquí -->
+        </div>
+        <section class="apartados" id="apartados" aria-labelledby="apartados-titulo" hidden>
+            <h3 class="apartados__titulo" id="apartados-titulo">
+                <i class="ph-fill ph-bookmark-simple" aria-hidden="true"></i>
+                <span data-i18n="reserve_title">Apartados</span>
+                <span class="apartados__conteo" id="apartados-conteo">0</span>
+            </h3>
+            <p class="apartados__politica" data-i18n="reserve_policy_short">Te los guardamos 48 h en sucursal · pagas al recoger.</p>
+            <div class="apartados__lista" id="apartados-lista"></div>
+        </section>
     </div>
     <div class="cart-panel__footer">
         <div class="cart-panel__total">
             <span data-i18n="cart_total">Total:</span>
             <span id="cart-total-price">$0.00</span>
         </div>
-        <button class="cart-panel__checkout"><i class="ph ph-credit-card"></i> <span data-i18n="cart_checkout">Proceder al pago</span></button>
+        <button type="button" class="cart-panel__checkout" id="btn-checkout" aria-haspopup="dialog"><i class="ph ph-credit-card"></i> <span data-i18n="cart_checkout">Proceder al pago</span></button>
     </div>
 </aside>
 
-<script>
+<!-- VISTA AMPLIADA DEL PRODUCTO -->
+<dialog class="modal-producto" id="modal-producto" aria-labelledby="modal-titulo">
+    <div class="modal-producto__caja">
+        <button type="button" class="modal-producto__cerrar" id="modal-cerrar" aria-label="Cerrar">
+            <i class="ph-bold ph-x"></i>
+        </button>
 
-// MODO OSCURO / CLARO
+        <div class="modal-producto__media" id="modal-media">
+            <img id="modal-img" src="data:," alt="">
+            <span class="modal-producto__zoom-hint" aria-hidden="true">
+                <i class="ph ph-magnifying-glass-plus"></i>
+                <span data-i18n="modal_zoom">Pasa el cursor para ampliar</span>
+            </span>
+        </div>
 
-const body = document.body;
-const btnTheme = document.getElementById('btnTheme');
-const themeIcon = btnTheme.querySelector('i');
-
-// Sincronizar preferencia inicial (revisa localStorage de catálogo o de admin)
-if (localStorage.getItem('kion-admin-theme') === 'dark' || localStorage.getItem('kion-catalog-theme') === 'dark') {
-    body.classList.add('dark-mode');
-    themeIcon.classList.replace('ph-moon', 'ph-sun');
-}
-
-btnTheme.addEventListener('click', () => {
-    body.classList.toggle('dark-mode');
-    const isDark = body.classList.contains('dark-mode');
-    
-    if (isDark) {
-        themeIcon.classList.replace('ph-moon', 'ph-sun');
-    } else {
-        themeIcon.classList.replace('ph-sun', 'ph-moon');
-    }
-    
-    // Guardar para que se recuerde tanto en catálogo como en dashboard
-    localStorage.setItem('kion-catalog-theme', isDark ? 'dark' : 'light');
-    localStorage.setItem('kion-admin-theme', isDark ? 'dark' : 'light');
-});
-
-// ==========================================
-// IDIOMA (Bilingüe)
-// ==========================================
-const I18N = {
-    es: {
-        topbar_sub: 'Experiencia Premium para el cuidado animal.',
-        nav_dashboard: 'Panel',
-        filter_title: 'Categorías',
-        filter_all: 'Todos los productos',
-        cat_title: 'Catálogo General',
-        cat_items: 'artículos',
-        empty_state: 'No hay productos con stock disponible en esta categoría.',
-        stock_lbl: 'Disponibles:',
-        stock_out: 'Agotado',
-        btn_add: 'Agregar al carrito',
-        btn_out: 'Sin stock',
-        cart_title: 'Tu Carrito',
-        cart_total: 'Total:',
-        cart_checkout: 'Proceder al pago',
-        cart_empty: 'Tu carrito está vacío.',
-        alert_added: 'Producto agregado al carrito',
-        alert_max: 'No puedes agregar más del stock disponible'
-    },
-    en: {
-        topbar_sub: 'Premium experience for animal care.',
-        nav_dashboard: 'Dashboard',
-        filter_title: 'Categories',
-        filter_all: 'All products',
-        cat_title: 'General Catalog',
-        cat_items: 'items',
-        empty_state: 'No products available in stock for this category.',
-        stock_lbl: 'In Stock:',
-        stock_out: 'Out of Stock',
-        btn_add: 'Add to Cart',
-        btn_out: 'No Stock',
-        cart_title: 'Your Cart',
-        cart_total: 'Total:',
-        cart_checkout: 'Proceed to Checkout',
-        cart_empty: 'Your cart is empty.',
-        alert_added: 'Product added to cart',
-        alert_max: 'You cannot exceed the available stock'
-    }
-};
-
-let currentLang = localStorage.getItem('kion-catalog-lang') || 'es';
-
-function t(key) { return I18N[currentLang][key] || key; }
-
-function applyLanguage() {
-    document.documentElement.lang = currentLang;
-    document.querySelectorAll('[data-i18n]').forEach(el => { 
-        el.innerHTML = t(el.dataset.i18n); 
-    });
-    renderCart(); // Re-renderizar carrito para traducir textos dinámicos
-}
-
-document.getElementById('btnLang').addEventListener('click', () => {
-    currentLang = currentLang === 'es' ? 'en' : 'es';
-    localStorage.setItem('kion-catalog-lang', currentLang);
-    applyLanguage();
-});
-
-// ==========================================
-// LÓGICA DEL CARRITO (Con control preciso de Stock)
-// ==========================================
-let cart = JSON.parse(localStorage.getItem('kion-cart')) || [];
-const cartOverlay = document.getElementById('cart-overlay');
-const cartPanel = document.getElementById('cart-panel');
-const cartItemsContainer = document.getElementById('cart-items');
-
-function saveCart() {
-    localStorage.setItem('kion-cart', JSON.stringify(cart));
-}
-
-function moneyFormat(val) {
-    return '$' + Number(val).toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-}
-
-function updateCartUI() {
-    const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
-    const totalPrice = cart.reduce((sum, item) => sum + (item.precio * item.qty), 0);
-    
-    document.getElementById('cart-count').textContent = totalQty;
-    document.getElementById('cart-total-price').textContent = moneyFormat(totalPrice);
-}
-
-function renderCart() {
-    if (cart.length === 0) {
-        cartItemsContainer.innerHTML = `<div style="text-align:center; color:var(--ink-soft); margin-top:40px;"><i class="ph ph-shopping-cart" style="font-size:40px; margin-bottom:10px;"></i><p>${t('cart_empty')}</p></div>`;
-    } else {
-        cartItemsContainer.innerHTML = cart.map(item => `
-            <div class="cart-item">
-                <img src="${item.img}" class="cart-item__img" alt="${item.nombre}">
-                <div class="cart-item__info">
-                    <div>
-                        <div class="cart-item__title">${item.nombre}</div>
-                        <div class="cart-item__price">${moneyFormat(item.precio)}</div>
-                    </div>
-                    <div class="cart-qty-controls">
-                        <button class="qty-btn btn-minus" data-id="${item.id}">-</button>
-                        <input type="number" class="qty-input" data-id="${item.id}" value="${item.qty}" min="1" max="${item.stock}">
-                        <button class="qty-btn btn-plus" data-id="${item.id}">+</button>
-                        <button class="btn-remove" data-id="${item.id}" title="Eliminar"><i class="ph ph-trash"></i></button>
-                    </div>
-                </div>
+        <div class="modal-producto__info">
+            <div class="modal-producto__meta">
+                <span class="modal-producto__categoria" id="modal-categoria"></span>
+                <span class="modal-producto__codigo" id="modal-codigo"></span>
             </div>
-        `).join('');
-    }
-    updateCartUI();
-}
+            <h2 class="modal-producto__titulo" id="modal-titulo"></h2>
+            <p class="modal-producto__descripcion" id="modal-descripcion"></p>
 
-function addToCart(id, nombre, precio, img, maxStock) {
-    const existing = cart.find(item => item.id === id);
-    if (existing) {
-        if (existing.qty < maxStock) {
-            existing.qty++;
-            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: t('alert_added'), showConfirmButton: false, timer: 1500, background: body.classList.contains('dark-mode') ? 'var(--bg-surface)' : '#fff', color: 'var(--ink)' });
-        } else {
-            Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: t('alert_max'), showConfirmButton: false, timer: 2000, background: body.classList.contains('dark-mode') ? 'var(--bg-surface)' : '#fff', color: 'var(--ink)' });
-        }
-    } else {
-        cart.push({ id, nombre, precio, img, stock: maxStock, qty: 1 });
-        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: t('alert_added'), showConfirmButton: false, timer: 1500, background: body.classList.contains('dark-mode') ? 'var(--bg-surface)' : '#fff', color: 'var(--ink)' });
-    }
-    saveCart();
-    renderCart();
-}
+            <div class="modal-producto__nota">
+                <i class="ph-fill ph-stethoscope" aria-hidden="true"></i>
+                <p><strong data-i18n="modal_note_title">Recomendación PETKO</strong> <span id="modal-nota"></span></p>
+            </div>
 
-function changeQty(id, newQty) {
-    const item = cart.find(i => i.id === id);
-    if (!item) return;
-    
-    let parsedQty = parseInt(newQty);
-    if (isNaN(parsedQty) || parsedQty < 1) parsedQty = 1;
-    if (parsedQty > item.stock) {
-        parsedQty = item.stock;
-        Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: t('alert_max'), showConfirmButton: false, timer: 2000, background: body.classList.contains('dark-mode') ? 'var(--bg-surface)' : '#fff', color: 'var(--ink)' });
-    }
-    
-    item.qty = parsedQty;
-    saveCart();
-    renderCart();
-}
+            <div class="modal-producto__precio-fila">
+                <span class="modal-producto__precio" id="modal-precio"></span>
+                <span class="tarjeta__stock" id="modal-stock"></span>
+            </div>
 
-// Event Listeners Globales
-document.addEventListener('click', e => {
-    // Agregar al carrito desde el catálogo
-    const addBtn = e.target.closest('.js-add-cart');
-    if (addBtn && !addBtn.disabled) {
-        addToCart(
-            addBtn.dataset.id, 
-            addBtn.dataset.nombre, 
-            parseFloat(addBtn.dataset.precio), 
-            addBtn.dataset.img, 
-            parseInt(addBtn.dataset.stock)
-        );
-    }
+            <div class="modal-producto__acciones">
+                <button type="button" class="btn-agregar js-add-cart" id="modal-agregar"></button>
+                <button type="button" class="btn-apartar" id="modal-apartar"></button>
+            </div>
 
-    // Botón Menos en Carrito
-    if (e.target.classList.contains('btn-minus')) {
-        const id = e.target.dataset.id;
-        const item = cart.find(i => i.id === id);
-        if (item && item.qty > 1) changeQty(id, item.qty - 1);
-    }
+            <p class="modal-producto__politica">
+                <i class="ph ph-info" aria-hidden="true"></i>
+                <span data-i18n="reserve_policy">Política PETKO: apartamos 1 pieza por producto durante 48 horas en sucursal, sin anticipo. Pagas al recoger.</span>
+            </p>
 
-    // Botón Más en Carrito
-    if (e.target.classList.contains('btn-plus')) {
-        const id = e.target.dataset.id;
-        const item = cart.find(i => i.id === id);
-        if (item) changeQty(id, item.qty + 1);
-    }
+            <ul class="modal-producto__beneficios">
+                <li><i class="ph-fill ph-first-aid-kit" aria-hidden="true"></i> <span data-i18n="benefit_1">Asesoría veterinaria</span></li>
+                <li><i class="ph-fill ph-storefront" aria-hidden="true"></i> <span data-i18n="benefit_2">Recoge en sucursal</span></li>
+                <li><i class="ph-fill ph-seal-check" aria-hidden="true"></i> <span data-i18n="benefit_3">Producto original</span></li>
+            </ul>
+        </div>
+    </div>
+</dialog>
 
-    // Eliminar del Carrito
-    const removeBtn = e.target.closest('.btn-remove');
-    if (removeBtn) {
-        cart = cart.filter(item => item.id !== removeBtn.dataset.id);
-        saveCart();
-        renderCart();
-    }
-});
+<!-- CHECKOUT: elegir cómo finalizar el pedido -->
+<dialog class="modal-producto modal-checkout" id="modal-checkout" aria-labelledby="checkout-titulo" aria-describedby="checkout-sub">
+    <div class="modal-producto__caja checkout__caja">
+        <button type="button" class="modal-producto__cerrar" id="checkout-cerrar" aria-label="Cerrar" data-i18n-aria="checkout_close">
+            <i class="ph-bold ph-x"></i>
+        </button>
 
-// Input de número manual en el carrito
-cartItemsContainer.addEventListener('change', e => {
-    if (e.target.classList.contains('qty-input')) {
-        changeQty(e.target.dataset.id, e.target.value);
-    }
-});
+        <header class="checkout__cabecera">
+            <span class="checkout__sello" aria-hidden="true"><i class="ph-fill ph-paw-print"></i></span>
+            <span class="modal-producto__categoria" data-i18n="checkout_eyebrow">Finalizar pedido</span>
+            <h2 class="checkout__titulo" id="checkout-titulo" data-i18n="checkout_title">¿Cómo deseas finalizar tu pedido?</h2>
+            <p class="checkout__sub" id="checkout-sub" data-i18n="checkout_sub">Elige la opción que mejor te acomode; en ambas generamos tu ticket al instante.</p>
+        </header>
 
-// Control del panel lateral
-document.getElementById('open-cart').addEventListener('click', () => {
-    cartOverlay.classList.add('active');
-    cartPanel.classList.add('active');
-});
-const closeCart = () => {
-    cartOverlay.classList.remove('active');
-    cartPanel.classList.remove('active');
-};
-document.getElementById('close-cart').addEventListener('click', closeCart);
-cartOverlay.addEventListener('click', closeCart);
+        <div class="checkout__resumen">
+            <div class="checkout__miniaturas" id="checkout-miniaturas" aria-hidden="true"></div>
+            <span class="checkout__articulos" id="checkout-articulos"></span>
+            <span class="checkout__total">
+                <span data-i18n="checkout_total">Total</span>
+                <strong id="checkout-total">$0.00</strong>
+            </span>
+        </div>
 
-// Inicialización
-applyLanguage();
-renderCart();
+        <div class="checkout__opciones">
+            <button type="button" class="checkout__opcion checkout__opcion--pagar" data-checkout="pagar">
+                <span class="checkout__opcion-icono" aria-hidden="true"><i class="ph ph-credit-card"></i></span>
+                <span class="checkout__opcion-texto">
+                    <span class="checkout__opcion-titulo" data-i18n="pay_now_title">Pagar ahora</span>
+                    <span class="checkout__opcion-metodo" data-i18n="pay_now_method">Tarjeta / Transferencia</span>
+                    <span class="checkout__opcion-desc" data-i18n="pay_now_desc">Pago seguro en línea y tu ticket de compra al momento.</span>
+                </span>
+                <i class="ph ph-caret-right checkout__opcion-flecha" aria-hidden="true"></i>
+            </button>
+
+            <button type="button" class="checkout__opcion checkout__opcion--sucursal" data-checkout="sucursal">
+                <span class="checkout__opcion-icono" aria-hidden="true"><i class="ph ph-storefront"></i></span>
+                <span class="checkout__opcion-texto">
+                    <span class="checkout__opcion-titulo" data-i18n="pay_store_title">Apartar y pagar en sucursal</span>
+                    <span class="checkout__opcion-metodo" data-i18n="pay_store_method">Efectivo</span>
+                    <span class="checkout__opcion-desc" data-i18n="pay_store_desc">Te guardamos tus productos 48 h; pagas en efectivo al recoger.</span>
+                </span>
+                <i class="ph ph-caret-right checkout__opcion-flecha" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <p class="modal-producto__politica checkout__nota">
+            <i class="ph ph-shield-check" aria-hidden="true"></i>
+            <span data-i18n="checkout_secure">Tus datos están protegidos. Recibirás un folio único para cualquier aclaración.</span>
+        </p>
+    </div>
+</dialog>
+
+<!-- TICKET DE COMPRA (simulado) -->
+<dialog class="modal-producto modal-ticket" id="modal-ticket" aria-labelledby="ticket-titulo" aria-describedby="ticket-sub">
+    <div class="modal-producto__caja ticket" id="ticket-caja" data-modo="pagar">
+        <button type="button" class="modal-producto__cerrar" id="ticket-cerrar" aria-label="Cerrar" data-i18n-aria="checkout_close">
+            <i class="ph-bold ph-x"></i>
+        </button>
+
+        <div class="ticket__parte ticket__parte--arriba">
+            <div class="ticket__confeti" aria-hidden="true">
+                <i class="ph-fill ph-paw-print" style="--x: -150px; --y: -70px; --r: -40deg; --d: 0s;"></i>
+                <i class="ph-fill ph-paw-print" style="--x: -95px; --y: -120px; --r: 25deg; --d: 0.06s;"></i>
+                <i class="ph-fill ph-paw-print" style="--x: -40px; --y: -140px; --r: -15deg; --d: 0.12s;"></i>
+                <i class="ph-fill ph-paw-print" style="--x: 40px; --y: -135px; --r: 30deg; --d: 0.04s;"></i>
+                <i class="ph-fill ph-paw-print" style="--x: 100px; --y: -110px; --r: -25deg; --d: 0.1s;"></i>
+                <i class="ph-fill ph-paw-print" style="--x: 150px; --y: -60px; --r: 45deg; --d: 0.08s;"></i>
+                <i class="ph-fill ph-sparkle" style="--x: -125px; --y: -15px; --r: 60deg; --d: 0.14s;"></i>
+                <i class="ph-fill ph-sparkle" style="--x: 125px; --y: -20px; --r: -60deg; --d: 0.16s;"></i>
+            </div>
+
+            <header class="ticket__cabecera">
+                <span class="ticket__estado-icono" aria-hidden="true"><i class="ph-bold ph-check" id="ticket-icono"></i></span>
+                <span class="ticket__marca"><i class="ph-fill ph-paw-print" aria-hidden="true"></i> PETKO</span>
+                <h2 class="ticket__titulo" id="ticket-titulo"></h2>
+                <p class="ticket__sub" id="ticket-sub"></p>
+            </header>
+
+            <dl class="ticket__datos">
+                <div>
+                    <dt data-i18n="ticket_folio">Folio</dt>
+                    <dd class="ticket__folio" id="ticket-folio"></dd>
+                </div>
+                <div>
+                    <dt data-i18n="ticket_date">Fecha</dt>
+                    <dd id="ticket-fecha"></dd>
+                </div>
+                <div>
+                    <dt data-i18n="ticket_method">Método</dt>
+                    <dd id="ticket-metodo"></dd>
+                </div>
+                <div>
+                    <dt data-i18n="ticket_status">Estado</dt>
+                    <dd><span class="ticket__badge" id="ticket-estado"></span></dd>
+                </div>
+            </dl>
+        </div>
+
+        <div class="ticket__parte ticket__parte--abajo">
+            <ul class="ticket__items" id="ticket-items"></ul>
+
+            <div class="ticket__total">
+                <span data-i18n="checkout_total">Total</span>
+                <strong id="ticket-total">$0.00</strong>
+            </div>
+
+            <div class="ticket__codigo" aria-hidden="true">
+                <span class="ticket__barras"></span>
+                <span id="ticket-codigo"></span>
+            </div>
+
+            <div class="ticket__mascota">
+                <img id="ticket-perrito" src="../../img/perrito_feliz.png" alt="">
+                <p data-i18n="dog_thanks">¡Guau! Gracias por tu pedido 🐾</p>
+            </div>
+
+            <button type="button" class="btn-agregar ticket__seguir" id="ticket-seguir">
+                <i class="ph ph-paw-print" aria-hidden="true"></i>
+                <span data-i18n="ticket_continue">Seguir comprando</span>
+            </button>
+        </div>
+    </div>
+</dialog>
+
+<div class="gato-zona gato-zona--izq" aria-hidden="true">
+    <img src="../../img/gato_izq.png?v=<?= (int) @filemtime(__DIR__ . '/../../img/gato_izq.png') ?>" alt="" class="gato-chismoso">
+</div>
+<div class="gato-zona gato-zona--der" aria-hidden="true">
+    <img src="../../img/gato_der.png?v=<?= (int) @filemtime(__DIR__ . '/../../img/gato_der.png') ?>" alt="" class="gato-chismoso">
+</div>
+
+<div class="perrito-flotante" id="perrito-flotante" data-tono="feliz" aria-hidden="true">
+    <img src="../../img/perrito_clinica.png" alt="" class="perrito-flotante__avatar">
+    <div class="perrito-flotante__burbuja">
+        <p id="perrito-flotante-texto"></p>
+        <i class="ph-fill ph-paw-print perrito-globo__huella"></i>
+    </div>
+</div>
+
+<div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<script>
+    window.PETKO_SESION = <?= json_encode([
+        'autenticado' => $usuarioAutenticado,
+        'loginUrl'    => $rutaLogin,
+    ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) ?>;
 </script>
+<script src="../../js/catalogo.js?v=<?= (int) @filemtime(__DIR__ . '/../../js/catalogo.js') ?>"></script>
 </body>
 </html>
